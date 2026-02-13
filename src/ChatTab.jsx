@@ -10,6 +10,12 @@ export default function ChatTab() {
   const [pendingImage, setPendingImage] = useState(null);
   const [pendingImageData, setPendingImageData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [mode, setMode] = useState("deep"); // "quick" = Sonnet, "deep" = Opus
+
+  const models = {
+    quick: "claude-sonnet-4-20250514",
+    deep: "claude-opus-4-5-20251101"
+  };
   const chatEndRef = useRef(null);
   const fileRef = useRef(null);
 
@@ -47,7 +53,7 @@ export default function ChatTab() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "claude-opus-4-5-20251101",
+          model: models[mode],
           max_tokens: 1000,
           system: buildSystemPrompt(),
           messages: trimmed,
@@ -63,7 +69,7 @@ export default function ChatTab() {
       setMessages(prev => [...prev, { role: "assistant", text: `Error: ${err.message}` }]);
     }
     setLoading(false);
-  }, [input, pendingImageData, pendingImage, messages]);
+  }, [input, pendingImageData, pendingImage, messages, mode]);
 
   const handleImage = useCallback((e) => {
     const file = e.target.files?.[0];
@@ -140,7 +146,25 @@ export default function ChatTab() {
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 8, alignItems: "flex-end", padding: "8px 0 4px", borderTop: `1px solid ${C.border}` }}>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", padding: "6px 0", borderTop: `1px solid ${C.border}` }}>
+        <button
+          onClick={() => setMode(mode === "quick" ? "deep" : "quick")}
+          style={{
+            padding: "4px 10px", borderRadius: 6, fontSize: 11, fontWeight: 500,
+            background: mode === "deep" ? C.gold : C.card,
+            color: mode === "deep" ? C.bg : C.textDim,
+            border: `1px solid ${mode === "deep" ? C.gold : C.border}`,
+            cursor: "pointer", transition: "all 0.15s",
+          }}
+        >
+          {mode === "deep" ? "Deep" : "Quick"}
+        </button>
+        <span style={{ fontSize: 10, color: C.textFaint }}>
+          {mode === "deep" ? "Opus" : "Sonnet"}
+        </span>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, alignItems: "flex-end", padding: "4px 0 4px" }}>
         <button
           onClick={() => fileRef.current?.click()}
           style={{ width: 40, height: 40, borderRadius: 10, background: C.card, border: `1px solid ${C.border}`, color: C.gold, fontSize: 18, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
