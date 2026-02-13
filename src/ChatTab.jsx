@@ -43,7 +43,7 @@ export default function ChatTab() {
 
       const trimmed = apiMessages.length > 12 ? apiMessages.slice(-12) : apiMessages;
 
-      const resp = await fetch("https://api.anthropic.com/v1/messages", {
+      const resp = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
