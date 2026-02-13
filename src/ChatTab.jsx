@@ -54,10 +54,13 @@ export default function ChatTab() {
         })
       });
       const data = await resp.json();
-      const reply = data.content?.map(i => i.text || "").filter(Boolean).join("\n") || "Sorry, couldn't process that. Try again?";
+      if (data.error) {
+        throw new Error(data.error.message || data.error || "API error");
+      }
+      const reply = data.content?.map(i => i.text || "").filter(Boolean).join("\n") || "No response from API";
       setMessages(prev => [...prev, { role: "assistant", text: reply }]);
     } catch (err) {
-      setMessages(prev => [...prev, { role: "assistant", text: "Connection issue — try again in a sec." }]);
+      setMessages(prev => [...prev, { role: "assistant", text: `Error: ${err.message}` }]);
     }
     setLoading(false);
   }, [input, pendingImageData, pendingImage, messages]);
