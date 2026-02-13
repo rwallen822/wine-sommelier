@@ -23,16 +23,16 @@ function App() {
   const tierLabel = (t) => t === "goldmine" ? "💰 GOLDMINE" : t === "good" ? "👍 GOOD BET" : "💎 SPLURGE";
 
   return (
-    <div style={{ background: C.bg, minHeight: "100vh", maxWidth: 480, margin: "0 auto", fontFamily: "'Cormorant Garamond', Georgia, serif", color: C.text, position: "relative", paddingBottom: 72 }}>
-      <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400;1,500&display=swap" rel="stylesheet" />
+    <div style={{ background: C.bg, minHeight: "100vh", maxWidth: 480, margin: "0 auto", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", color: C.text, position: "relative", paddingBottom: 72 }}>
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
       {/* Header */}
-      <div style={{ padding: "20px 16px 12px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+      <div style={{ padding: "16px 16px 12px", background: C.card, borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div>
-          <div style={{ fontSize: 10, letterSpacing: 4, color: C.goldDim, textTransform: "uppercase", fontWeight: 500 }}>Personal Sommelier</div>
-          <div style={{ fontSize: 24, fontWeight: 300, letterSpacing: 1, color: C.gold, lineHeight: 1.1 }}>Rich's Wine Guide</div>
+          <div style={{ fontSize: 22, fontWeight: 700, color: C.accent, lineHeight: 1.1 }}>Wine Guide</div>
+          <div style={{ fontSize: 11, color: C.textDim, marginTop: 2 }}>Your personal sommelier</div>
         </div>
-        <div style={{ fontSize: 11, color: C.textFaint, fontStyle: "italic", textAlign: "right", lineHeight: 1.3 }}>texture & finesse<br />wines that glide</div>
+        <div style={{ width: 36, height: 36, borderRadius: "50%", background: C.accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🍷</div>
       </div>
 
       {/* Content */}
@@ -177,20 +177,22 @@ function App() {
       {/* Bottom Nav */}
       <div style={{
         position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)",
-        width: "100%", maxWidth: 480, background: C.bg,
+        width: "100%", maxWidth: 480, background: C.card,
         borderTop: `1px solid ${C.border}`,
         display: "flex", justifyContent: "space-around",
-        padding: "6px 0 env(safe-area-inset-bottom, 8px)", zIndex: 100,
+        padding: "8px 0 env(safe-area-inset-bottom, 10px)", zIndex: 100,
+        boxShadow: "0 -2px 10px rgba(0,0,0,0.05)",
       }}>
         {tabs.map(t => (
           <button key={t.id} onClick={() => { setTab(t.id); if (t.id !== "chat") window.scrollTo(0, 0); }}
             style={{
-              background: "none", border: "none", padding: "6px 4px", cursor: "pointer",
-              display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
-              opacity: tab === t.id ? 1 : 0.45, transition: "opacity 0.15s", minWidth: 0, flex: 1,
+              background: tab === t.id ? C.accentGlow : "none",
+              border: "none", padding: "8px 12px", cursor: "pointer",
+              display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
+              borderRadius: 12, transition: "all 0.15s", minWidth: 0, flex: 1,
             }}>
-            <span style={{ fontSize: 18 }}>{t.icon}</span>
-            <span style={{ fontSize: 9.5, color: tab === t.id ? C.gold : C.textDim, fontFamily: "inherit", letterSpacing: 0.5, fontWeight: tab === t.id ? 600 : 400 }}>{t.label}</span>
+            <span style={{ fontSize: 20 }}>{t.icon}</span>
+            <span style={{ fontSize: 10, color: tab === t.id ? C.accent : C.textDim, fontWeight: tab === t.id ? 600 : 500 }}>{t.label}</span>
           </button>
         ))}
       </div>
@@ -199,7 +201,7 @@ function App() {
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         ::-webkit-scrollbar { display: none; }
         body { margin: 0; background: ${C.bg}; }
-        textarea::placeholder { color: ${C.textFaint}; font-family: 'Cormorant Garamond', Georgia, serif; }
+        textarea::placeholder { color: ${C.textFaint}; font-family: 'Inter', sans-serif; }
       `}</style>
     </div>
   );

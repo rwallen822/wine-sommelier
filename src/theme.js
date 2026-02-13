@@ -1,22 +1,34 @@
 export const C = {
-  bg: "#0F0D0B",
-  card: "#1A1714",
-  cardHover: "#221F1A",
-  border: "#2D2822",
-  accent: "#8B2635",
-  accentLight: "#A63446",
-  accentGlow: "rgba(139, 38, 53, 0.15)",
-  gold: "#C9A84C",
-  goldDim: "#8B7535",
-  text: "#E8E0D4",
-  textDim: "#9B9284",
-  textFaint: "#6B6358",
-  green: "#4A7C59",
-  greenBg: "rgba(74, 124, 89, 0.12)",
-  red: "#8B3A3A",
-  redBg: "rgba(139, 58, 58, 0.12)",
-  yellow: "#8B7535",
-  yellowBg: "rgba(139, 117, 53, 0.12)",
-  chatUser: "#2A2318",
-  chatBot: "#1A1714",
+  // Light, modern base
+  bg: "#FAFAFA",
+  card: "#FFFFFF",
+  cardHover: "#F5F5F5",
+  border: "#E5E5E5",
+
+  // Wine-inspired accents
+  accent: "#722F37",        // Deep wine red
+  accentLight: "#9B4D54",
+  accentGlow: "rgba(114, 47, 55, 0.08)",
+
+  // Modern gold/amber
+  gold: "#B8860B",
+  goldDim: "#D4A84B",
+  goldBg: "rgba(184, 134, 11, 0.08)",
+
+  // Text
+  text: "#1A1A1A",
+  textDim: "#666666",
+  textFaint: "#999999",
+
+  // Status colors
+  green: "#2E7D4A",
+  greenBg: "rgba(46, 125, 74, 0.1)",
+  red: "#C53030",
+  redBg: "rgba(197, 48, 48, 0.08)",
+  yellow: "#B7791F",
+  yellowBg: "rgba(183, 121, 31, 0.1)",
+
+  // Chat
+  chatUser: "#722F37",
+  chatBot: "#FFFFFF",
 };
