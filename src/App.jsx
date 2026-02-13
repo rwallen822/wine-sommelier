@@ -35,10 +35,13 @@ function App() {
         <div style={{ width: 36, height: 36, borderRadius: "50%", background: C.accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🍷</div>
       </div>
 
-      {/* Content */}
-      <div style={{ padding: tab === "chat" ? "8px 16px 0" : "16px 16px 0" }}>
+      {/* Chat Tab - always mounted to preserve state */}
+      <div style={{ padding: "8px 16px 0", display: tab === "chat" ? "block" : "none" }}>
+        <ChatTab />
+      </div>
 
-        {tab === "chat" && <ChatTab />}
+      {/* Other Content */}
+      <div style={{ padding: "16px 16px 0", display: tab !== "chat" ? "block" : "none" }}>
 
         {tab === "grapes" && (
           <div>
