@@ -1,0 +1,118 @@
+// ============================================================
+// RICH'S PALATE PROFILE
+// This is the single source of truth for all wine preferences.
+// Update this file as your palate evolves.
+// Last updated: February 13, 2026
+// ============================================================
+
+export const PALATE_CORE = {
+  description: "Texture and finesse — wines that glide. Light, perfumed, mineral-driven with lift and energy, not weight or jamminess. Silky, aromatic, transparent. The delicate dancer.",
+  oneSentence: "A delicate dancer that's light on its toes — silky, perfumed, fruity but not jammy, minerally but not astringent, lean and feminine.",
+  values: ["terroir expression", "mineral soils", "transparency", "cool climate", "Old World"],
+  dislikes: ["extraction", "new oak at low price", "warm climate fruit-forward", "marketing-driven wines"],
+  alcoholSweetSpot: "12.5-13.5% ideal, under 14% preferred",
+  shop: "FWGS Premium Collection, Ridge Pike, Royersford PA",
+};
+
+export const GRAPE_GUIDE = [
+  { name: "Pinot Noir", safety: "always", note: "Your grape. Burgundy, Oregon, cool-climate." },
+  { name: "Nebbiolo", safety: "always", note: "Barolo, Barbaresco, Langhe, Valtellina, Alto Piemonte." },
+  { name: "Nerello Mascalese", safety: "always", note: "Etna's Pinot Noir. Volcanic, silky, pale, aromatic." },
+  { name: "Gamay", safety: "always", note: "Beaujolais cru. Floral, mineral, perfumed, $15-25." },
+  { name: "Frappato", safety: "always", note: "Sicily. Strawberry, herbs, flowers. Lightest of the safe grapes." },
+  { name: "Cab Franc (Loire)", safety: "sometimes", note: "Chinon, Bourgueil. Violets, graphite, wet stone. NOT Napa." },
+  { name: "Grenache", safety: "sometimes", note: "Only old vines, low yield. CdP can work. Avoid young/hot." },
+  { name: "Sangiovese", safety: "sometimes", note: "Chianti Classico on limestone. Can be too leathery." },
+  { name: "Mencía", safety: "sometimes", note: "Bierzo, Ribeira Sacra. Spain's Pinot Noir. Floral, mineral." },
+  { name: "Malbec", safety: "avoid", note: "Dense, dark, extracted. Opposite of what you want." },
+  { name: "Petite Sirah", safety: "avoid", note: "Inky, tannic, heavy. No finesse." },
+  { name: "Zinfandel", safety: "avoid", note: "Jammy, high alcohol, fruit-forward." },
+  { name: "Shiraz (Aus)", safety: "avoid", note: "Thick, peppery, extracted. Wrong universe." },
+  { name: "Primitivo", safety: "avoid", note: "Southern Italian Zinfandel. Same problems." },
+];
+
+export const REGIONS = [
+  { name: "Beaujolais Cru", tier: "goldmine", price: "$15-25", note: "Fleurie (ethereal), Morgon (earthy/umami), Moulin-à-Vent (Burgundian), Chiroubles (lightest). Any cru = safe." },
+  { name: "Etna Rosso", tier: "goldmine", price: "$20-28", note: "Nerello Mascalese on volcanic soil. Pale, aromatic, silky, mineral. Terre Nere benchmark." },
+  { name: "Langhe Nebbiolo", tier: "goldmine", price: "$18-28", note: "Baby Barolo. Roses, cherry, tar, silk. Vajra, Produttori del Barbaresco." },
+  { name: "Loire Cab Franc", tier: "goldmine", price: "$15-25", note: "Chinon, Bourgueil, Saumur-Champigny. Violets, graphite, wet stone." },
+  { name: "Valpolicella Classico", tier: "goldmine", price: "$15-22", note: "NOT Amarone/Ripasso. Corvina: cherry, almond, herbs, light body." },
+  { name: "Valtellina Superiore", tier: "goldmine", price: "$20-30", note: "Alpine Nebbiolo. Lighter, more aromatic than Barolo. Your Triacca find." },
+  { name: "Frappato / Vittoria", tier: "goldmine", price: "$15-20", note: "Sicily. Strawberry, herbs, flowers. Lightest, most feminine Italian red." },
+  { name: "Chianti Classico", tier: "good", price: "$18-25", note: "Sangiovese on limestone. Cherry, leather, herbs. Gallo Nero. Sometimes too leathery." },
+  { name: "Bourgogne Rouge", tier: "good", price: "$20-30", note: "Regional Burgundy Pinot. Jadot, Drouhin, Bouchard. Variable quality." },
+  { name: "Mencía (Bierzo)", tier: "good", price: "$15-20", note: "Spain's Pinot Noir. Floral, mineral. Pétalos is benchmark." },
+  { name: "Margaux", tier: "splurge", price: "$30-60+", note: "YOUR HOME. Finest gravel, most feminine Left Bank. Perfume, silk, violets." },
+  { name: "Saint-Julien", tier: "splurge", price: "$40-60+", note: "Most balanced Left Bank. Beychevelle & Branaire-Ducru for your style." },
+  { name: "Pessac-Léognan", tier: "splurge", price: "$30-50+", note: "Smoke, graphite, wet gravel. Most Burgundian Bordeaux." },
+  { name: "Haut-Médoc", tier: "splurge", price: "$25-45", note: "Best classified value. Cantemerle (5th Growth, ~$30). La Lagune." },
+];
+
+export const BORDEAUX_GUIDE = {
+  priority: [
+    { rank: 1, name: "Margaux", personality: "The ballerina. Most feminine, aromatic, floral. Violets, silk, graphite.", picks: "Malescot St-Exupéry, Durfort-Vivens, Giscours, Alter Ego de Palmer, Paveil de Luze, Prieuré-Lichine, du Tertre" },
+    { rank: 2, name: "Saint-Julien", personality: "The ballerina-athlete. Most balanced. Cedar, cassis, seamless polish.", picks: "Beychevelle, Branaire-Ducru, Talbot, Lagrange" },
+    { rank: 3, name: "Pessac-Léognan", personality: "The earthy intellectual. Smoke, graphite, wet gravel. Most Burgundian.", picks: "Latour-Martillac, de Fieuzal, Carbonnieux, Olivier" },
+    { rank: 4, name: "Haut-Médoc", personality: "The value play. Adjacent to classified estates at lower prices.", picks: "Cantemerle (5th Growth!), Sociando-Mallet, La Lagune" },
+    { rank: 5, name: "Pauillac", personality: "The powerhouse. Dense in youth. Better in lighter vintages or with age.", picks: "Carruades de Lafite, Le Petit Mouton" },
+    { rank: 6, name: "Saint-Estèphe", personality: "The austere one. More clay = more weight. Only with age.", picks: "Cos d'Estournel, Calon-Ségur (with age)" },
+  ],
+  vintages: [
+    { year: "2021", verdict: "YOUR vintage", detail: "Lighter, lifted, aromatic, more Burgundian. Lower scores = lower prices." },
+    { year: "2016", verdict: "Great & elegant", detail: "Structure with freshness. Fine-grained tannins." },
+    { year: "2014", verdict: "Classic", detail: "Restrained, fresh, aromatic. Drinking beautifully now." },
+    { year: "2019", verdict: "Excellent", detail: "Ripe, balanced. Some may push too ripe at lower end." },
+    { year: "2020", verdict: "Excellent", detail: "Similar to 2019. Approachable, polished." },
+    { year: "2018", verdict: "Very good", detail: "Drinking well now. Riper than 2021." },
+    { year: "2017", verdict: "Caution", detail: "Irregular. Many mediocre bottles." },
+  ],
+  avoid: ["Pomerol", "Saint-Émilion", "Fronsac", "Generic Bordeaux/Bordeaux Supérieur"],
+};
+
+export const LABEL_TIPS = {
+  green: [
+    { flag: "Alcohol 12.5-13.5%", detail: "Most reliable indicator. Lower = cooler climate, more elegance." },
+    { flag: "Classico / Cru / 1er Cru / Riserva", detail: "Stricter rules, better sites, more care." },
+    { flag: "Place name (not grape name)", detail: "Terroir-driven. Morgon > Gamay." },
+    { flag: "Vieilles Vignes / Old Vines", detail: "Less fruit, more concentration and complexity." },
+    { flag: "Organic / Biodynamic", detail: "Less manipulated, more transparent." },
+    { flag: "Grand Cru Classé / Cru Bourgeois", detail: "Official quality recognition. Matters in Bordeaux." },
+  ],
+  red: [
+    { flag: "Alcohol over 14.5%", detail: "Warm climate, ripe fruit, heavier body." },
+    { flag: "'Smooth' / 'Velvety' / 'Rich'", detail: "Marketing for fruit-forward/extracted wines." },
+    { flag: "Critter labels / flashy design", detail: "Money went to packaging, not farming." },
+    { flag: "'100% new French oak'", detail: "At this price, masks wine rather than enhances." },
+    { flag: "Lodi / Central Valley / Pays d'Oc", detail: "Large, warm, high-volume regions." },
+  ],
+};
+
+export const SHOP_SCRIPTS = [
+  "\"I'm looking for something light to medium-bodied, aromatic, with good acidity and fine tannins. I like Volnay, Margaux, and Barolo — that silky, perfumed style. Under $30 with finesse?\"",
+  "\"Something that drinks like Burgundy but isn't Burgundy. Under $30.\"",
+  "\"Any Beaujolais cru? Fleurie, Morgon, or Moulin-à-Vent?\"",
+  "\"Anything from Etna? Nerello Mascalese?\"",
+  "\"Left Bank Bordeaux — Margaux or Saint-Julien in the $35-60 range?\"",
+];
+
+// ============================================================
+// TASTING HISTORY
+// Add wines here as you try them for the AI to reference.
+// ============================================================
+export const TASTING_HISTORY = [
+  { wine: "Louis Latour Volnay 1er Cru 'En Chevret'", verdict: "loved", notes: "Silky, perfumed, floating. The Margaux of Burgundy." },
+  { wine: "Shea Wine Cellars Estate Pinot Noir 2011", verdict: "loved", notes: "Aged Oregon. Earthy, mushroomy, savory. 13.9% alc." },
+  { wine: "Tenuta delle Terre Nere Etna Rosso", verdict: "loved", notes: "Volcanic, mineral, silky. Benchmark Etna." },
+  { wine: "ARPEPE Valtellina Superiore", verdict: "loved", notes: "Alpine Nebbiolo. Elegant, aromatic." },
+  { wine: "Proprietà Sperino Uvaggio", verdict: "loved", notes: "Alto Piemonte. Wild, herbal, mineral." },
+  { wine: "Sebaste Ghè Barolo Riserva", verdict: "loved", notes: "Powerful side of Barolo but still balanced." },
+  { wine: "Cristom Mt. Jefferson Cuvée Pinot Noir", verdict: "loved", notes: "Umami Oregon. Mushroom, tobacco, forest floor." },
+  { wine: "Côte de Nuits-Villages 'En Vierville' 2021", verdict: "loved", rating: "A+", notes: "Perfumed, light, named vineyard. 2021 = perfect vintage." },
+  { wine: "Joseph Drouhin Morgon", verdict: "loved", rating: "A", notes: "Earthy, savory, umami Beaujolais cru." },
+  { wine: "Triacca Valtellina Superiore 'Casa La Gatta' 2020", verdict: "liked", rating: "A-", notes: "Alpine Nebbiolo discovery. Lighter than Barolo." },
+  { wine: "Domaine de la Madone Beaujolais-Villages 'Le Perréon' 2022", verdict: "liked", rating: "B+", notes: "Good Tuesday wine. Not transcendent but pleasant." },
+  { wine: "Castello di Verrazzano Chianti Classico 2021", verdict: "liked", rating: "B+", notes: "Historic estate. May lean leathery." },
+  { wine: "Maranges Michel Sarrazin 2022", verdict: "liked", rating: "B", notes: "Value Burgundy. Honest, slightly rustic." },
+  { wine: "Château Ormes de Pez Saint-Estèphe 2021", verdict: "neutral", rating: "C+", notes: "Saint-Estèphe experiment. Tight, needs decanting. 2021 vintage helps." },
+  { wine: "Chester|Kidder Columbia Valley 2020", verdict: "experiment", rating: "D", notes: "Washington State experiment. Dense, extracted, high alcohol. Antithesis of style." },
+];
