@@ -1,11 +1,39 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { C } from "./theme";
 import { buildSystemPrompt } from "./systemPrompt";
+import { getMessages, saveMessages, addTastingEntry, addPalateNote } from "./storage";
+
+const DEFAULT_GREETING = { role: "assistant", text: "Hey Rich. What are we drinking tonight? Send me a photo or tell me what's in the glass." };
+
+function parseAndStripTags(text) {
+  let cleanText = text;
+  const tastingMatch = text.match(/<!--TASTING:(.*?)-->/s);
+  const palateMatch = text.match(/<!--PALATE:(.*?)-->/s);
+
+  if (tastingMatch) {
+    try {
+      const entry = JSON.parse(tastingMatch[1]);
+      addTastingEntry(entry);
+    } catch {}
+    cleanText = cleanText.replace(tastingMatch[0], "").trim();
+  }
+
+  if (palateMatch) {
+    try {
+      const data = JSON.parse(palateMatch[1]);
+      addPalateNote(data.text);
+    } catch {}
+    cleanText = cleanText.replace(palateMatch[0], "").trim();
+  }
+
+  return cleanText;
+}
 
 export default function ChatTab() {
-  const [messages, setMessages] = useState([
-    { role: "assistant", text: "Hey Rich. What are we drinking tonight? Send me a photo or tell me what's in the glass." }
-  ]);
+  const [messages, setMessages] = useState(() => {
+    const stored = getMessages();
+    return stored.length > 0 ? stored : [DEFAULT_GREETING];
+  });
   const [input, setInput] = useState("");
   const [pendingImage, setPendingImage] = useState(null);
   const [pendingImageData, setPendingImageData] = useState(null);
@@ -22,6 +50,15 @@ export default function ChatTab() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
+
+  // Save messages to localStorage whenever they change
+  useEffect(() => {
+    if (messages.length > 0) {
+      // Don't save images to localStorage (too large), just save text
+      const toSave = messages.map(m => ({ role: m.role, text: m.text }));
+      saveMessages(toSave);
+    }
+  }, [messages]);
 
   const sendMessage = useCallback(async () => {
     const text = input.trim();
@@ -63,7 +100,8 @@ export default function ChatTab() {
       if (data.error) {
         throw new Error(data.error.message || data.error || "API error");
       }
-      const reply = data.content?.map(i => i.text || "").filter(Boolean).join("\n") || "No response from API";
+      const rawReply = data.content?.map(i => i.text || "").filter(Boolean).join("\n") || "No response from API";
+      const reply = parseAndStripTags(rawReply);
       setMessages(prev => [...prev, { role: "assistant", text: reply }]);
     } catch (err) {
       setMessages(prev => [...prev, { role: "assistant", text: `Error: ${err.message}` }]);

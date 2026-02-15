@@ -2,15 +2,18 @@ import { useState } from "react";
 import { C } from "./theme";
 import { GRAPE_GUIDE, REGIONS, BORDEAUX_GUIDE, LABEL_TIPS, SHOP_SCRIPTS, PALATE_CORE } from "./palateConfig";
 import ChatTab from "./ChatTab";
+import { getTastingLog, getPalateNotes, exportAllData } from "./storage";
 
 function App() {
   const [tab, setTab] = useState("chat");
   const [expandedRegion, setExpandedRegion] = useState(null);
   const [expandedBdx, setExpandedBdx] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [cellarSort, setCellarSort] = useState("date"); // "date" or "rating"
 
   const tabs = [
     { id: "chat", label: "Chat", icon: "💬" },
+    { id: "cellar", label: "My Cellar", icon: "🍷" },
     { id: "grapes", label: "Grapes", icon: "🍇" },
     { id: "regions", label: "Regions", icon: "🗺" },
     { id: "bordeaux", label: "Bordeaux", icon: "🏰" },
@@ -98,6 +101,78 @@ function App() {
 
       {/* Other Content */}
       <div style={{ padding: "16px 16px 0", display: tab !== "chat" ? "block" : "none" }}>
+
+        {tab === "cellar" && (() => {
+          const tastings = getTastingLog();
+          const palateNotes = getPalateNotes();
+          const parseRating = (r) => parseFloat((r || "0").toString().replace("/10", ""));
+          const sorted = [...tastings].sort((a, b) =>
+            cellarSort === "rating" ? parseRating(b.rating) - parseRating(a.rating) : (b.date || "").localeCompare(a.date || "")
+          );
+
+          const handleExport = () => {
+            const data = exportAllData();
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = `wine-cellar-backup-${new Date().toISOString().split("T")[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+          };
+
+          return (
+            <div>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 16 }}>
+                <div>
+                  <div style={{ fontSize: 11, letterSpacing: 3, color: C.goldDim, textTransform: "uppercase" }}>Tasting Log</div>
+                  <div style={{ fontSize: 20, fontWeight: 500, color: C.text, marginTop: 2 }}>My Cellar</div>
+                </div>
+                <div style={{ fontSize: 12, color: C.textDim }}>{sorted.length} wines</div>
+              </div>
+
+              {/* Sort + Export */}
+              <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+                <button onClick={() => setCellarSort("date")} style={{ padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600, background: cellarSort === "date" ? C.accent : C.card, color: cellarSort === "date" ? "#fff" : C.textDim, border: `1px solid ${cellarSort === "date" ? C.accent : C.border}`, cursor: "pointer" }}>Newest</button>
+                <button onClick={() => setCellarSort("rating")} style={{ padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600, background: cellarSort === "rating" ? C.accent : C.card, color: cellarSort === "rating" ? "#fff" : C.textDim, border: `1px solid ${cellarSort === "rating" ? C.accent : C.border}`, cursor: "pointer" }}>Top Rated</button>
+                <button onClick={handleExport} style={{ marginLeft: "auto", padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 500, background: C.card, color: C.gold, border: `1px solid ${C.border}`, cursor: "pointer" }}>Export JSON</button>
+              </div>
+
+              {/* Tasting entries */}
+              {sorted.length === 0 ? (
+                <div style={{ padding: 24, textAlign: "center", color: C.textDim, fontSize: 14 }}>
+                  No tastings logged yet. Chat with the sommelier about wines you've tried and they'll appear here automatically.
+                </div>
+              ) : sorted.map((t, i) => (
+                <div key={i} style={{ padding: "14px 16px", marginBottom: 8, background: C.card, borderRadius: 10, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.accent}` }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                    <div style={{ fontSize: 15, fontWeight: 600, color: C.text, flex: 1 }}>{t.wine}</div>
+                    {t.rating && <div style={{ fontSize: 14, fontWeight: 700, color: C.gold, marginLeft: 8, whiteSpace: "nowrap" }}>{t.rating}</div>}
+                  </div>
+                  {t.notes && <div style={{ fontSize: 12.5, color: C.textDim, marginTop: 6, lineHeight: 1.5, fontStyle: "italic" }}>{t.notes}</div>}
+                  <div style={{ display: "flex", gap: 12, marginTop: 8 }}>
+                    {t.region && <div style={{ fontSize: 11, color: C.textFaint }}>{t.region}</div>}
+                    {t.grape && <div style={{ fontSize: 11, color: C.textFaint }}>{t.grape}</div>}
+                    <div style={{ fontSize: 11, color: C.textFaint, marginLeft: "auto" }}>{t.date}</div>
+                  </div>
+                </div>
+              ))}
+
+              {/* Palate Notes */}
+              {palateNotes.length > 0 && (
+                <div style={{ marginTop: 24 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: C.gold, marginBottom: 10, letterSpacing: 1, textTransform: "uppercase" }}>Palate Evolution</div>
+                  {palateNotes.map((n, i) => (
+                    <div key={i} style={{ padding: "10px 12px", marginBottom: 5, background: C.accentGlow, borderRadius: 8, borderLeft: `3px solid ${C.gold}` }}>
+                      <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>{n.text}</div>
+                      <div style={{ fontSize: 10, color: C.textFaint, marginTop: 4 }}>{n.date}</div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {tab === "grapes" && (
           <div>
