@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { C } from "./theme";
 import { GRAPE_GUIDE, REGIONS, BORDEAUX_GUIDE, LABEL_TIPS, SHOP_SCRIPTS, PALATE_CORE } from "./palateConfig";
 import ChatTab from "./ChatTab";
@@ -7,6 +7,17 @@ function App() {
   const [tab, setTab] = useState("chat");
   const [expandedRegion, setExpandedRegion] = useState(null);
   const [expandedBdx, setExpandedBdx] = useState(null);
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+
+  useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const onResize = () => {
+      setKeyboardOpen(vv.height < window.innerHeight * 0.75);
+    };
+    vv.addEventListener("resize", onResize);
+    return () => vv.removeEventListener("resize", onResize);
+  }, []);
 
   const tabs = [
     { id: "chat", label: "Chat", icon: "💬" },
@@ -37,7 +48,7 @@ function App() {
 
       {/* Chat Tab - always mounted to preserve state */}
       <div style={{ padding: "8px 16px 0", display: tab === "chat" ? "block" : "none" }}>
-        <ChatTab />
+        <ChatTab keyboardOpen={keyboardOpen} />
       </div>
 
       {/* Other Content */}
@@ -177,12 +188,12 @@ function App() {
         )}
       </div>
 
-      {/* Bottom Nav */}
+      {/* Bottom Nav - hidden when keyboard is open */}
       <div style={{
         position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)",
         width: "100%", maxWidth: 480, background: C.card,
         borderTop: `1px solid ${C.border}`,
-        display: "flex", justifyContent: "space-around",
+        display: keyboardOpen ? "none" : "flex", justifyContent: "space-around",
         padding: "8px 0 env(safe-area-inset-bottom, 10px)", zIndex: 100,
         boxShadow: "0 -2px 10px rgba(0,0,0,0.05)",
       }}>

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { C } from "./theme";
 import { buildSystemPrompt } from "./systemPrompt";
 
-export default function ChatTab() {
+export default function ChatTab({ keyboardOpen }) {
   const [messages, setMessages] = useState([
     { role: "assistant", text: "Hey Rich. What are we drinking tonight? Send me a photo or tell me what's in the glass." }
   ]);
@@ -91,7 +91,7 @@ export default function ChatTab() {
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 140px)", position: "relative" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: keyboardOpen ? "calc(100vh - 60px)" : "calc(100vh - 140px)", position: "relative", paddingBottom: keyboardOpen ? 0 : 72 }}>
       <div style={{ flex: 1, overflowY: "auto", padding: "8px 0", WebkitOverflowScrolling: "touch" }}>
         {messages.map((m, i) => (
           <div key={i} style={{ padding: "4px 0" }}>
