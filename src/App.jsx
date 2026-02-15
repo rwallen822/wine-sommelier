@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { C } from "./theme";
 import { GRAPE_GUIDE, REGIONS, BORDEAUX_GUIDE, LABEL_TIPS, SHOP_SCRIPTS, PALATE_CORE } from "./palateConfig";
 import ChatTab from "./ChatTab";
@@ -7,26 +7,22 @@ function App() {
   const [tab, setTab] = useState("chat");
   const [expandedRegion, setExpandedRegion] = useState(null);
   const [expandedBdx, setExpandedBdx] = useState(null);
-  const [keyboardOpen, setKeyboardOpen] = useState(false);
-
-  useEffect(() => {
-    const vv = window.visualViewport;
-    if (!vv) return;
-    const onResize = () => {
-      setKeyboardOpen(vv.height < window.innerHeight * 0.75);
-    };
-    vv.addEventListener("resize", onResize);
-    return () => vv.removeEventListener("resize", onResize);
-  }, []);
+  const [drawerOpen, setDrawerOpen] = useState(false);
 
   const tabs = [
     { id: "chat", label: "Chat", icon: "💬" },
     { id: "grapes", label: "Grapes", icon: "🍇" },
     { id: "regions", label: "Regions", icon: "🗺" },
-    { id: "bordeaux", label: "Bdx", icon: "🏰" },
+    { id: "bordeaux", label: "Bordeaux", icon: "🏰" },
     { id: "labels", label: "Labels", icon: "🏷" },
     { id: "talk", label: "Scripts", icon: "🗣" },
   ];
+
+  const selectTab = (id) => {
+    setTab(id);
+    setDrawerOpen(false);
+    if (id !== "chat") window.scrollTo(0, 0);
+  };
 
   const safetyColor = (s) => s === "always" ? C.green : s === "sometimes" ? C.gold : C.red;
   const safetyBg = (s) => s === "always" ? C.greenBg : s === "sometimes" ? C.yellowBg : C.redBg;
@@ -34,21 +30,70 @@ function App() {
   const tierLabel = (t) => t === "goldmine" ? "💰 GOLDMINE" : t === "good" ? "👍 GOOD BET" : "💎 SPLURGE";
 
   return (
-    <div style={{ background: C.bg, minHeight: "100vh", maxWidth: 480, margin: "0 auto", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", color: C.text, position: "relative", paddingBottom: 72 }}>
+    <div style={{ background: C.bg, minHeight: "100vh", maxWidth: 480, margin: "0 auto", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", color: C.text, position: "relative" }}>
       <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
 
       {/* Header */}
-      <div style={{ padding: "16px 16px 12px", background: C.card, borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div style={{ padding: "16px 16px 12px", background: C.card, borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, zIndex: 50 }}>
         <div>
           <div style={{ fontSize: 22, fontWeight: 700, color: C.accent, lineHeight: 1.1 }}>Wine Guide</div>
           <div style={{ fontSize: 11, color: C.textDim, marginTop: 2 }}>Your personal sommelier</div>
         </div>
-        <div style={{ width: 36, height: 36, borderRadius: "50%", background: C.accent, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>🍷</div>
+        <button
+          onClick={() => setDrawerOpen(true)}
+          style={{
+            width: 40, height: 40, borderRadius: 10, background: C.bg, border: `1px solid ${C.border}`,
+            fontSize: 22, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+            color: C.text,
+          }}
+        >☰</button>
+      </div>
+
+      {/* Drawer overlay */}
+      {drawerOpen && (
+        <div
+          onClick={() => setDrawerOpen(false)}
+          style={{
+            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
+            background: "rgba(0,0,0,0.4)", zIndex: 200,
+          }}
+        />
+      )}
+
+      {/* Slide-out drawer */}
+      <div style={{
+        position: "fixed", top: 0, right: drawerOpen ? 0 : -280, bottom: 0, width: 280,
+        background: C.card, zIndex: 300, transition: "right 0.25s ease",
+        boxShadow: drawerOpen ? "-4px 0 20px rgba(0,0,0,0.15)" : "none",
+        display: "flex", flexDirection: "column",
+      }}>
+        <div style={{ padding: "20px 20px 16px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ fontSize: 16, fontWeight: 700, color: C.accent }}>Menu</div>
+          <button
+            onClick={() => setDrawerOpen(false)}
+            style={{ width: 32, height: 32, borderRadius: 8, background: C.bg, border: `1px solid ${C.border}`, fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: C.textDim }}
+          >✕</button>
+        </div>
+        <div style={{ padding: "12px 0", flex: 1 }}>
+          {tabs.map(t => (
+            <button key={t.id} onClick={() => selectTab(t.id)}
+              style={{
+                display: "flex", alignItems: "center", gap: 14, width: "100%",
+                padding: "14px 24px", border: "none", cursor: "pointer",
+                background: tab === t.id ? C.accentGlow : "transparent",
+                borderRight: tab === t.id ? `3px solid ${C.accent}` : "3px solid transparent",
+                transition: "all 0.15s",
+              }}>
+              <span style={{ fontSize: 22 }}>{t.icon}</span>
+              <span style={{ fontSize: 15, fontWeight: tab === t.id ? 600 : 400, color: tab === t.id ? C.accent : C.text }}>{t.label}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Chat Tab - always mounted to preserve state */}
       <div style={{ padding: "8px 16px 0", display: tab === "chat" ? "block" : "none" }}>
-        <ChatTab keyboardOpen={keyboardOpen} />
+        <ChatTab />
       </div>
 
       {/* Other Content */}
@@ -186,29 +231,6 @@ function App() {
             </div>
           </div>
         )}
-      </div>
-
-      {/* Bottom Nav - hidden when keyboard is open */}
-      <div style={{
-        position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)",
-        width: "100%", maxWidth: 480, background: C.card,
-        borderTop: `1px solid ${C.border}`,
-        display: keyboardOpen ? "none" : "flex", justifyContent: "space-around",
-        padding: "8px 0 env(safe-area-inset-bottom, 10px)", zIndex: 100,
-        boxShadow: "0 -2px 10px rgba(0,0,0,0.05)",
-      }}>
-        {tabs.map(t => (
-          <button key={t.id} onClick={() => { setTab(t.id); if (t.id !== "chat") window.scrollTo(0, 0); }}
-            style={{
-              background: tab === t.id ? C.accentGlow : "none",
-              border: "none", padding: "8px 12px", cursor: "pointer",
-              display: "flex", flexDirection: "column", alignItems: "center", gap: 3,
-              borderRadius: 12, transition: "all 0.15s", minWidth: 0, flex: 1,
-            }}>
-            <span style={{ fontSize: 20 }}>{t.icon}</span>
-            <span style={{ fontSize: 10, color: tab === t.id ? C.accent : C.textDim, fontWeight: tab === t.id ? 600 : 500 }}>{t.label}</span>
-          </button>
-        ))}
       </div>
 
       <style>{`
