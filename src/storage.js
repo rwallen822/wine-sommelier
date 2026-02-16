@@ -31,17 +31,26 @@ function scheduleCloudSync() {
 
 async function pushToCloud() {
   try {
-    await fetch("/api/sync-save", {
+    const payload = {
+      messages: getMessages(),
+      tastings: getTastingLog(),
+      palate: getPalateNotes(),
+    };
+    console.log("[sync] pushing to cloud:", payload.messages.length, "msgs,", payload.tastings.length, "tastings,", payload.palate.length, "palate");
+    const resp = await fetch("/api/sync-save", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        messages: getMessages(),
-        tastings: getTastingLog(),
-        palate: getPalateNotes(),
-      }),
+      body: JSON.stringify(payload),
     });
+    if (!resp.ok) {
+      console.warn("[sync] push failed:", resp.status, await resp.text());
+      return;
+    }
+    console.log("[sync] push success");
     setJSON(KEYS.lastSync, new Date().toISOString());
-  } catch {}
+  } catch (err) {
+    console.warn("[sync] push error:", err);
+  }
 }
 
 export async function pullFromCloud() {
@@ -52,6 +61,7 @@ export async function pullFromCloud() {
       return false;
     }
     const cloud = await resp.json();
+    console.log("[sync] pulled from cloud:", cloud);
     if (!cloud) return false;
 
     let updated = false;
