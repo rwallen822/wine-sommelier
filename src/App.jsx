@@ -10,9 +10,14 @@ function App() {
   const [expandedBdx, setExpandedBdx] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [cellarSort, setCellarSort] = useState("date"); // "date" or "rating"
+  const [syncKey, setSyncKey] = useState(0); // bumped after cloud pull to trigger re-renders
 
-  // Pull cloud data on startup
-  useEffect(() => { pullFromCloud(); }, []);
+  // Pull cloud data on startup, then bump syncKey so components re-read localStorage
+  useEffect(() => {
+    pullFromCloud().then((updated) => {
+      if (updated) setSyncKey(k => k + 1);
+    });
+  }, []);
 
   const tabs = [
     { id: "chat", label: "Chat", icon: "💬" },
@@ -99,7 +104,7 @@ function App() {
 
       {/* Chat Tab - always mounted to preserve state */}
       <div style={{ padding: "8px 16px 0", display: tab === "chat" ? "block" : "none" }}>
-        <ChatTab />
+        <ChatTab syncKey={syncKey} />
       </div>
 
       {/* Other Content */}

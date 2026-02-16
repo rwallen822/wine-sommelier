@@ -47,10 +47,14 @@ async function pushToCloud() {
 export async function pullFromCloud() {
   try {
     const resp = await fetch("/api/sync-load");
+    if (!resp.ok) {
+      console.warn("Cloud sync load failed:", resp.status);
+      return false;
+    }
     const cloud = await resp.json();
-    if (!cloud) return;
+    if (!cloud) return false;
 
-    // Merge: cloud data wins for tastings/palate (append unique), local wins for messages
+    let updated = false;
     const localTastings = getTastingLog();
     const localPalate = getPalateNotes();
     const localMessages = getMessages();
@@ -61,6 +65,7 @@ export async function pullFromCloud() {
       const newEntries = cloud.tastings.filter(t => !existingKeys.has(`${t.wine}|${t.date}`));
       if (newEntries.length > 0) {
         setJSON(KEYS.tastings, [...localTastings, ...newEntries]);
+        updated = true;
       }
     }
 
@@ -70,14 +75,21 @@ export async function pullFromCloud() {
       const newNotes = cloud.palate.filter(n => !existingKeys.has(`${n.text}|${n.date}`));
       if (newNotes.length > 0) {
         setJSON(KEYS.palate, [...localPalate, ...newNotes]);
+        updated = true;
       }
     }
 
     // Messages: use cloud if local is empty
     if (localMessages.length === 0 && cloud.messages?.length > 0) {
       setJSON(KEYS.messages, cloud.messages);
+      updated = true;
     }
-  } catch {}
+
+    return updated;
+  } catch (err) {
+    console.warn("Cloud sync error:", err);
+    return false;
+  }
 }
 
 // --- Messages ---

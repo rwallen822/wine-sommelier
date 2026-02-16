@@ -29,7 +29,7 @@ function parseAndStripTags(text) {
   return cleanText;
 }
 
-export default function ChatTab() {
+export default function ChatTab({ syncKey }) {
   const [messages, setMessages] = useState(() => {
     const stored = getMessages();
     return stored.length > 0 ? stored : [DEFAULT_GREETING];
@@ -50,6 +50,16 @@ export default function ChatTab() {
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
+
+  // Re-read messages from localStorage after cloud sync completes
+  useEffect(() => {
+    if (syncKey > 0) {
+      const stored = getMessages();
+      if (stored.length > 0) {
+        setMessages(stored);
+      }
+    }
+  }, [syncKey]);
 
   // Save messages to localStorage whenever they change
   useEffect(() => {
