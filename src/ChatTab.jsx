@@ -5,7 +5,7 @@ import { getMessages, saveMessages } from "./storage";
 import { TOOL_DEFINITIONS, executeToolCall } from "./toolDefinitions";
 
 const DEFAULT_GREETING = { role: "assistant", text: "Hey Rich. What are we drinking tonight? Send me a photo or tell me what's in the glass." };
-const MAX_TOOL_LOOPS = 5;
+const MAX_TOOL_LOOPS = 8;
 
 export default function ChatTab({ syncKey, onDataUpdated }) {
   const [messages, setMessages] = useState(() => {
@@ -45,21 +45,52 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
     }
   }, [messages]);
 
-  // API call helper
-  const callAPI = useCallback(async (apiMessages) => {
+  // API call helper with logging
+  const callAPI = useCallback(async (apiMessages, maxTokens = 4096) => {
+    const requestBody = {
+      model: models[mode],
+      max_tokens: maxTokens,
+      system: buildSystemPrompt(),
+      messages: apiMessages,
+      tools: TOOL_DEFINITIONS,
+    };
+
+    console.log("[chat] API request:", {
+      model: requestBody.model,
+      max_tokens: requestBody.max_tokens,
+      messageCount: apiMessages.length,
+      toolCount: TOOL_DEFINITIONS.length,
+      lastMessage: apiMessages[apiMessages.length - 1],
+    });
+
     const resp = await fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: models[mode],
-        max_tokens: 1500,
-        system: buildSystemPrompt(),
-        messages: apiMessages,
-        tools: TOOL_DEFINITIONS,
-      }),
+      body: JSON.stringify(requestBody),
     });
-    const data = await resp.json();
-    if (data.error) throw new Error(data.error.message || data.error || "API error");
+
+    const responseText = await resp.text();
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseErr) {
+      console.error("[chat] Failed to parse API response:", responseText.slice(0, 500));
+      throw new Error(`API returned invalid JSON (status ${resp.status})`);
+    }
+
+    console.log("[chat] API response:", {
+      status: resp.status,
+      stop_reason: data.stop_reason,
+      contentTypes: data.content?.map(b => b.type),
+      error: data.error,
+    });
+
+    if (data.error) {
+      console.error("[chat] API error detail:", data.error);
+      const msg = typeof data.error === "string" ? data.error : data.error.message || JSON.stringify(data.error);
+      throw new Error(msg);
+    }
+
     return data;
   }, [mode]);
 
@@ -104,24 +135,74 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
       let loopMessages = [...trimmed];
       let loops = 0;
 
-      while (response.stop_reason === "tool_use" && loops < MAX_TOOL_LOOPS) {
-        loops++;
+      while (loops < MAX_TOOL_LOOPS) {
+        // Check if the response wants tool use
+        if (response.stop_reason !== "tool_use") break;
+
+        // Guard: make sure content is an array with tool_use blocks
+        if (!Array.isArray(response.content)) {
+          console.warn("[chat] stop_reason is tool_use but content is not an array:", response.content);
+          break;
+        }
+
         const toolUseBlocks = response.content.filter(b => b.type === "tool_use");
+        if (toolUseBlocks.length === 0) {
+          console.warn("[chat] stop_reason is tool_use but no tool_use blocks found in content");
+          break;
+        }
+
+        loops++;
+        console.log(`[chat] Tool loop iteration ${loops}:`, toolUseBlocks.map(b => `${b.name}(${JSON.stringify(b.input).slice(0, 100)}...)`));
+
         const toolResults = [];
 
         for (const block of toolUseBlocks) {
-          const result = executeToolCall(block.name, block.input);
-          toolResults.push({
-            type: "tool_result",
-            tool_use_id: block.id,
-            content: JSON.stringify(result),
-          });
-          // Only show confirmations for write operations, not reads
-          if (block.name !== "read_section") {
-            toolConfirmations.push({
-              role: "system",
-              text: result.message,
-              toolName: block.name,
+          try {
+            const result = executeToolCall(block.name, block.input);
+            console.log(`[chat] Tool ${block.name} result:`, { success: result.success, message: result.message, hasData: !!result.data });
+
+            // For tool results with large data (read_section), truncate if needed
+            let resultContent = JSON.stringify(result);
+            if (resultContent.length > 50000) {
+              console.warn(`[chat] Tool result very large (${resultContent.length} chars), truncating data`);
+              const truncated = { ...result, data: result.data, _note: "Full data included" };
+              resultContent = JSON.stringify(truncated);
+              // If still too large, summarize
+              if (resultContent.length > 50000) {
+                const summary = {
+                  success: result.success,
+                  message: result.message,
+                  entryCount: Array.isArray(result.data) ? result.data.length : "object",
+                  entries: Array.isArray(result.data)
+                    ? result.data.map(e => ({ name: e.name || e.wine || e.flag || e.text, ...(e.safety && { safety: e.safety }), ...(e.tier && { tier: e.tier }) }))
+                    : result.data,
+                };
+                resultContent = JSON.stringify(summary);
+                console.log(`[chat] Summarized to ${resultContent.length} chars`);
+              }
+            }
+
+            toolResults.push({
+              type: "tool_result",
+              tool_use_id: block.id,
+              content: resultContent,
+            });
+
+            // Only show confirmations for write operations, not reads
+            if (block.name !== "read_section") {
+              toolConfirmations.push({
+                role: "system",
+                text: result.message,
+                toolName: block.name,
+              });
+            }
+          } catch (toolErr) {
+            console.error(`[chat] Tool ${block.name} execution error:`, toolErr);
+            toolResults.push({
+              type: "tool_result",
+              tool_use_id: block.id,
+              content: JSON.stringify({ success: false, message: `Tool error: ${toolErr.message}` }),
+              is_error: true,
             });
           }
         }
@@ -133,15 +214,40 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
           { role: "user", content: toolResults },
         ];
 
-        response = await callAPI(loopMessages);
+        // Use higher token limit for tool loop follow-ups (AI may need to generate large rewrite payloads)
+        response = await callAPI(loopMessages, 8192);
+      }
+
+      if (loops >= MAX_TOOL_LOOPS) {
+        console.warn("[chat] Hit max tool loop limit");
+      }
+
+      // Handle stop_reason === "max_tokens" — the response was cut off
+      if (response.stop_reason === "max_tokens") {
+        console.warn("[chat] Response truncated (max_tokens). Content:", response.content);
       }
 
       // Extract text from final response
-      const replyText = response.content
-        ?.filter(b => b.type === "text")
-        .map(b => b.text)
-        .filter(Boolean)
-        .join("\n") || "No response from API";
+      let replyText = "";
+      if (Array.isArray(response.content)) {
+        replyText = response.content
+          .filter(b => b.type === "text")
+          .map(b => b.text)
+          .filter(Boolean)
+          .join("\n");
+      } else if (typeof response.content === "string") {
+        replyText = response.content;
+      }
+
+      if (!replyText) {
+        console.warn("[chat] No text in final response. stop_reason:", response.stop_reason, "content:", response.content);
+        // If we got tool confirmations but no final text, provide a fallback
+        if (toolConfirmations.length > 0) {
+          replyText = "Done.";
+        } else {
+          replyText = "Sorry, I didn't get a response. Try again?";
+        }
+      }
 
       // Add confirmations + reply
       setMessages(prev => [
@@ -155,6 +261,7 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
         onDataUpdated();
       }
     } catch (err) {
+      console.error("[chat] sendMessage error:", err);
       setMessages(prev => [...prev, { role: "assistant", text: `Error: ${err.message}` }]);
     }
     setLoading(false);
@@ -278,7 +385,7 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
         <button
           onClick={() => fileRef.current?.click()}
           style={{ width: 44, height: 44, borderRadius: 22, background: C.card, border: `1px solid ${C.border}`, color: C.accent, fontSize: 20, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}
-        >📷</button>
+        >{"\u{1F4F7}"}</button>
         <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handleImage} style={{ display: "none" }} />
         <textarea
           value={input}
@@ -303,7 +410,7 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
             opacity: loading ? 0.5 : 1, display: "flex", alignItems: "center", justifyContent: "center",
             transition: "background 0.15s",
           }}
-        >↑</button>
+        >{"\u2191"}</button>
       </div>
 
       <style>{`

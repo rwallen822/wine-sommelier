@@ -453,10 +453,29 @@ export function rewriteSection(section, data) {
   const key = keyMap[section];
   if (!key) return { success: false, message: `Unknown section: ${section}` };
 
-  setJSON(key, data);
+  let toSave = data;
+
+  // Labels need special handling: the AI sends an array but storage expects {green:[], red:[]}
+  if (section === "labels" && Array.isArray(data)) {
+    toSave = { green: [], red: [] };
+    for (const item of data) {
+      const cat = item.category || item.type || "green";
+      const entry = { flag: item.flag, detail: item.detail };
+      if (item.source) entry.source = item.source;
+      if (cat === "red") toSave.red.push(entry);
+      else toSave.green.push(entry);
+    }
+  }
+
+  // Labels might also come as {green:[], red:[]} already
+  if (section === "labels" && !Array.isArray(data) && data.green) {
+    toSave = data;
+  }
+
+  setJSON(key, toSave);
   scheduleCloudSync();
 
-  const count = Array.isArray(data) ? data.length : (data.green?.length || 0) + (data.red?.length || 0);
+  const count = Array.isArray(toSave) ? toSave.length : (toSave.green?.length || 0) + (toSave.red?.length || 0);
   return { success: true, message: `Rewrote ${section}: now ${count} entries` };
 }
 

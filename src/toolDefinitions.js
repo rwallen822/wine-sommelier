@@ -133,7 +133,11 @@ export const TOOL_DEFINITIONS = [
       type: "object",
       properties: {
         section: { type: "string", enum: ["grapes", "regions", "labels", "cellar", "palateNotes"], description: "Which section to rewrite" },
-        data: { description: "The complete replacement data — array of entries or object matching the section's schema" },
+        data: {
+          type: "array",
+          description: "The complete replacement data as an array of entries. For labels, use an array of objects with a 'category' field ('green' or 'red') — the handler will restructure into {green:[], red:[]}.",
+          items: { type: "object" },
+        },
       },
       required: ["section", "data"],
     },
