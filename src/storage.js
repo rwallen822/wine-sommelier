@@ -2,6 +2,7 @@ const KEYS = {
   messages: "wine-sommelier-messages",
   tastings: "wine-sommelier-tastings",
   palate: "wine-sommelier-palate",
+  lastSync: "wine-sommelier-last-sync",
 };
 
 const MAX_MESSAGES = 100;
@@ -17,6 +18,68 @@ function setJSON(key, val) {
   localStorage.setItem(key, JSON.stringify(val));
 }
 
+// --- Cloud Sync ---
+let syncTimeout = null;
+
+function scheduleCloudSync() {
+  // Debounce: wait 2 seconds after last change before syncing
+  if (syncTimeout) clearTimeout(syncTimeout);
+  syncTimeout = setTimeout(() => {
+    pushToCloud();
+  }, 2000);
+}
+
+async function pushToCloud() {
+  try {
+    await fetch("/api/sync-save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: getMessages(),
+        tastings: getTastingLog(),
+        palate: getPalateNotes(),
+      }),
+    });
+    setJSON(KEYS.lastSync, new Date().toISOString());
+  } catch {}
+}
+
+export async function pullFromCloud() {
+  try {
+    const resp = await fetch("/api/sync-load");
+    const cloud = await resp.json();
+    if (!cloud) return;
+
+    // Merge: cloud data wins for tastings/palate (append unique), local wins for messages
+    const localTastings = getTastingLog();
+    const localPalate = getPalateNotes();
+    const localMessages = getMessages();
+
+    // Merge tastings - deduplicate by wine+date
+    if (cloud.tastings?.length) {
+      const existingKeys = new Set(localTastings.map(t => `${t.wine}|${t.date}`));
+      const newEntries = cloud.tastings.filter(t => !existingKeys.has(`${t.wine}|${t.date}`));
+      if (newEntries.length > 0) {
+        setJSON(KEYS.tastings, [...localTastings, ...newEntries]);
+      }
+    }
+
+    // Merge palate notes - deduplicate by text+date
+    if (cloud.palate?.length) {
+      const existingKeys = new Set(localPalate.map(n => `${n.text}|${n.date}`));
+      const newNotes = cloud.palate.filter(n => !existingKeys.has(`${n.text}|${n.date}`));
+      if (newNotes.length > 0) {
+        setJSON(KEYS.palate, [...localPalate, ...newNotes]);
+      }
+    }
+
+    // Messages: use cloud if local is empty
+    if (localMessages.length === 0 && cloud.messages?.length > 0) {
+      setJSON(KEYS.messages, cloud.messages);
+    }
+  } catch {}
+}
+
 // --- Messages ---
 export function getMessages() {
   return getJSON(KEYS.messages) || [];
@@ -25,6 +88,7 @@ export function getMessages() {
 export function saveMessages(msgs) {
   const capped = msgs.slice(-MAX_MESSAGES);
   setJSON(KEYS.messages, capped);
+  scheduleCloudSync();
 }
 
 // --- Tasting Log ---
@@ -36,6 +100,7 @@ export function addTastingEntry(entry) {
   const log = getTastingLog();
   log.push({ ...entry, date: entry.date || new Date().toISOString().split("T")[0] });
   setJSON(KEYS.tastings, log);
+  scheduleCloudSync();
 }
 
 // --- Palate Notes ---
@@ -47,6 +112,7 @@ export function addPalateNote(note) {
   const notes = getPalateNotes();
   notes.push({ text: note, date: new Date().toISOString().split("T")[0] });
   setJSON(KEYS.palate, notes);
+  scheduleCloudSync();
 }
 
 // --- Export / Clear ---
@@ -61,4 +127,5 @@ export function exportAllData() {
 
 export function clearAllData() {
   Object.values(KEYS).forEach(k => localStorage.removeItem(k));
+  pushToCloud();
 }

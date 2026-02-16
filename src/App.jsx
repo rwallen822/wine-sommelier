@@ -1,8 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { C } from "./theme";
 import { GRAPE_GUIDE, REGIONS, BORDEAUX_GUIDE, LABEL_TIPS, SHOP_SCRIPTS, PALATE_CORE } from "./palateConfig";
 import ChatTab from "./ChatTab";
-import { getTastingLog, getPalateNotes, exportAllData } from "./storage";
+import { getTastingLog, getPalateNotes, exportAllData, pullFromCloud } from "./storage";
 
 function App() {
   const [tab, setTab] = useState("chat");
@@ -10,6 +10,9 @@ function App() {
   const [expandedBdx, setExpandedBdx] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [cellarSort, setCellarSort] = useState("date"); // "date" or "rating"
+
+  // Pull cloud data on startup
+  useEffect(() => { pullFromCloud(); }, []);
 
   const tabs = [
     { id: "chat", label: "Chat", icon: "💬" },
