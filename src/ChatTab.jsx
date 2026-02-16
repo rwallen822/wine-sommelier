@@ -116,11 +116,14 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
             tool_use_id: block.id,
             content: JSON.stringify(result),
           });
-          toolConfirmations.push({
-            role: "system",
-            text: result.message,
-            toolName: block.name,
-          });
+          // Only show confirmations for write operations, not reads
+          if (block.name !== "read_section") {
+            toolConfirmations.push({
+              role: "system",
+              text: result.message,
+              toolName: block.name,
+            });
+          }
         }
 
         // Continue conversation with tool results

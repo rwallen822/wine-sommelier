@@ -441,6 +441,25 @@ export function deletePalateNote(index) {
   }
 }
 
+// --- Rewrite Section (full replacement) ---
+export function rewriteSection(section, data) {
+  const keyMap = {
+    grapes: KEYS.grapes,
+    regions: KEYS.regions,
+    labels: KEYS.labels,
+    cellar: KEYS.cellar,
+    palateNotes: KEYS.palateNotes,
+  };
+  const key = keyMap[section];
+  if (!key) return { success: false, message: `Unknown section: ${section}` };
+
+  setJSON(key, data);
+  scheduleCloudSync();
+
+  const count = Array.isArray(data) ? data.length : (data.green?.length || 0) + (data.red?.length || 0);
+  return { success: true, message: `Rewrote ${section}: now ${count} entries` };
+}
+
 // --- Export / Clear ---
 export function exportAllData() {
   return {
