@@ -1,35 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { C } from "./theme";
 import { buildSystemPrompt } from "./systemPrompt";
-import { getMessages, saveMessages, addTastingEntry, addPalateNote } from "./storage";
+import { getMessages, saveMessages } from "./storage";
+import { TOOL_DEFINITIONS, executeToolCall } from "./toolDefinitions";
 
 const DEFAULT_GREETING = { role: "assistant", text: "Hey Rich. What are we drinking tonight? Send me a photo or tell me what's in the glass." };
+const MAX_TOOL_LOOPS = 5;
 
-function parseAndStripTags(text) {
-  let cleanText = text;
-  const tastingMatch = text.match(/<!--TASTING:(.*?)-->/s);
-  const palateMatch = text.match(/<!--PALATE:(.*?)-->/s);
-
-  if (tastingMatch) {
-    try {
-      const entry = JSON.parse(tastingMatch[1]);
-      addTastingEntry(entry);
-    } catch {}
-    cleanText = cleanText.replace(tastingMatch[0], "").trim();
-  }
-
-  if (palateMatch) {
-    try {
-      const data = JSON.parse(palateMatch[1]);
-      addPalateNote(data.text);
-    } catch {}
-    cleanText = cleanText.replace(palateMatch[0], "").trim();
-  }
-
-  return cleanText;
-}
-
-export default function ChatTab({ syncKey }) {
+export default function ChatTab({ syncKey, onDataUpdated }) {
   const [messages, setMessages] = useState(() => {
     const stored = getMessages();
     return stored.length > 0 ? stored : [DEFAULT_GREETING];
@@ -38,7 +16,7 @@ export default function ChatTab({ syncKey }) {
   const [pendingImage, setPendingImage] = useState(null);
   const [pendingImageData, setPendingImageData] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [mode, setMode] = useState("deep"); // "quick" = Sonnet, "deep" = Opus
+  const [mode, setMode] = useState("deep");
 
   const models = {
     quick: "claude-sonnet-4-20250514",
@@ -51,24 +29,39 @@ export default function ChatTab({ syncKey }) {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
-  // Re-read messages from localStorage after cloud sync completes
+  // Re-read messages from localStorage after cloud sync
   useEffect(() => {
     if (syncKey > 0) {
       const stored = getMessages();
-      if (stored.length > 0) {
-        setMessages(stored);
-      }
+      if (stored.length > 0) setMessages(stored);
     }
   }, [syncKey]);
 
   // Save messages to localStorage whenever they change
   useEffect(() => {
     if (messages.length > 0) {
-      // Don't save images to localStorage (too large), just save text
       const toSave = messages.map(m => ({ role: m.role, text: m.text }));
       saveMessages(toSave);
     }
   }, [messages]);
+
+  // API call helper
+  const callAPI = useCallback(async (apiMessages) => {
+    const resp = await fetch("/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: models[mode],
+        max_tokens: 1500,
+        system: buildSystemPrompt(),
+        messages: apiMessages,
+        tools: TOOL_DEFINITIONS,
+      }),
+    });
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error.message || data.error || "API error");
+    return data;
+  }, [mode]);
 
   const sendMessage = useCallback(async () => {
     const text = input.trim();
@@ -84,40 +77,85 @@ export default function ChatTab({ syncKey }) {
     setLoading(true);
 
     try {
-      const apiMessages = newMessages.filter(m => m.role !== "system").map(m => {
-        if (m.role === "user" && m.image && m === userMsg && imgData) {
-          const content = [];
-          content.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: imgData } });
-          content.push({ type: "text", text: text || "What do you think of this bottle? Give me your honest assessment." });
-          return { role: "user", content };
-        }
-        return { role: m.role, content: m.text };
-      });
+      // Build API messages (exclude system tool confirmations)
+      const buildApiMessages = (msgs) => {
+        return msgs
+          .filter(m => m.role !== "system")
+          .map((m, i) => {
+            if (m.role === "user" && m.image && i === msgs.length - 1 && imgData) {
+              return {
+                role: "user",
+                content: [
+                  { type: "image", source: { type: "base64", media_type: "image/jpeg", data: imgData } },
+                  { type: "text", text: text || "What do you think of this bottle? Give me your honest assessment." },
+                ],
+              };
+            }
+            return { role: m.role, content: m.text };
+          });
+      };
 
+      let apiMessages = buildApiMessages(newMessages);
       const trimmed = apiMessages.length > 12 ? apiMessages.slice(-12) : apiMessages;
 
-      const resp = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: models[mode],
-          max_tokens: 1000,
-          system: buildSystemPrompt(),
-          messages: trimmed,
-        })
-      });
-      const data = await resp.json();
-      if (data.error) {
-        throw new Error(data.error.message || data.error || "API error");
+      // Tool use loop
+      let response = await callAPI(trimmed);
+      let toolConfirmations = [];
+      let loopMessages = [...trimmed];
+      let loops = 0;
+
+      while (response.stop_reason === "tool_use" && loops < MAX_TOOL_LOOPS) {
+        loops++;
+        const toolUseBlocks = response.content.filter(b => b.type === "tool_use");
+        const toolResults = [];
+
+        for (const block of toolUseBlocks) {
+          const result = executeToolCall(block.name, block.input);
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: block.id,
+            content: JSON.stringify(result),
+          });
+          toolConfirmations.push({
+            role: "system",
+            text: result.message,
+            toolName: block.name,
+          });
+        }
+
+        // Continue conversation with tool results
+        loopMessages = [
+          ...loopMessages,
+          { role: "assistant", content: response.content },
+          { role: "user", content: toolResults },
+        ];
+
+        response = await callAPI(loopMessages);
       }
-      const rawReply = data.content?.map(i => i.text || "").filter(Boolean).join("\n") || "No response from API";
-      const reply = parseAndStripTags(rawReply);
-      setMessages(prev => [...prev, { role: "assistant", text: reply }]);
+
+      // Extract text from final response
+      const replyText = response.content
+        ?.filter(b => b.type === "text")
+        .map(b => b.text)
+        .filter(Boolean)
+        .join("\n") || "No response from API";
+
+      // Add confirmations + reply
+      setMessages(prev => [
+        ...prev,
+        ...toolConfirmations,
+        { role: "assistant", text: replyText },
+      ]);
+
+      // Notify parent if tools were executed
+      if (toolConfirmations.length > 0 && onDataUpdated) {
+        onDataUpdated();
+      }
     } catch (err) {
       setMessages(prev => [...prev, { role: "assistant", text: `Error: ${err.message}` }]);
     }
     setLoading(false);
-  }, [input, pendingImageData, pendingImage, messages, mode]);
+  }, [input, pendingImageData, pendingImage, messages, mode, callAPI, onDataUpdated]);
 
   const handleImage = useCallback((e) => {
     const file = e.target.files?.[0];
@@ -142,27 +180,47 @@ export default function ChatTab({ syncKey }) {
     <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 70px)", position: "relative" }}>
       <div style={{ flex: 1, overflowY: "auto", padding: "8px 0", WebkitOverflowScrolling: "touch" }}>
         {messages.map((m, i) => (
-          <div key={i} style={{ padding: "4px 0" }}>
-            <div style={{
-              maxWidth: "85%",
-              marginLeft: m.role === "user" ? "auto" : 0,
-              marginRight: m.role === "user" ? 0 : "auto",
-              padding: "12px 16px",
-              borderRadius: m.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
-              background: m.role === "user" ? C.chatUser : C.chatBot,
-              border: m.role === "user" ? "none" : `1px solid ${C.border}`,
-              boxShadow: m.role === "user" ? "none" : "0 1px 3px rgba(0,0,0,0.06)",
-            }}>
-              {m.image && (
-                <img src={m.image} alt="" style={{ maxWidth: "100%", maxHeight: 200, borderRadius: 8, marginBottom: m.text && m.text !== "(photo)" ? 8 : 0, display: "block" }} />
-              )}
-              {m.text && m.text !== "(photo)" && (
-                <div style={{ fontSize: 14, lineHeight: 1.6, color: m.role === "user" ? "#FFFFFF" : C.text, whiteSpace: "pre-wrap" }}>{m.text}</div>
-              )}
-            </div>
-            <div style={{ fontSize: 9, color: C.textFaint, marginTop: 2, textAlign: m.role === "user" ? "right" : "left", paddingLeft: m.role === "user" ? 0 : 4, paddingRight: m.role === "user" ? 4 : 0 }}>
-              {m.role === "user" ? "you" : "sommelier"}
-            </div>
+          <div key={i} style={{ padding: m.role === "system" ? "2px 0" : "4px 0" }}>
+            {/* Tool confirmation (system message) */}
+            {m.role === "system" && (
+              <div style={{
+                padding: "6px 12px",
+                fontSize: 12,
+                color: C.green,
+                background: C.greenBg,
+                borderRadius: 8,
+                borderLeft: `3px solid ${C.green}`,
+                fontWeight: 500,
+                maxWidth: "85%",
+              }}>
+                {m.text}
+              </div>
+            )}
+            {/* User or assistant message */}
+            {m.role !== "system" && (
+              <>
+                <div style={{
+                  maxWidth: "85%",
+                  marginLeft: m.role === "user" ? "auto" : 0,
+                  marginRight: m.role === "user" ? 0 : "auto",
+                  padding: "12px 16px",
+                  borderRadius: m.role === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
+                  background: m.role === "user" ? C.chatUser : C.chatBot,
+                  border: m.role === "user" ? "none" : `1px solid ${C.border}`,
+                  boxShadow: m.role === "user" ? "none" : "0 1px 3px rgba(0,0,0,0.06)",
+                }}>
+                  {m.image && (
+                    <img src={m.image} alt="" style={{ maxWidth: "100%", maxHeight: 200, borderRadius: 8, marginBottom: m.text && m.text !== "(photo)" ? 8 : 0, display: "block" }} />
+                  )}
+                  {m.text && m.text !== "(photo)" && (
+                    <div style={{ fontSize: 14, lineHeight: 1.6, color: m.role === "user" ? "#FFFFFF" : C.text, whiteSpace: "pre-wrap" }}>{m.text}</div>
+                  )}
+                </div>
+                <div style={{ fontSize: 9, color: C.textFaint, marginTop: 2, textAlign: m.role === "user" ? "right" : "left", paddingLeft: m.role === "user" ? 0 : 4, paddingRight: m.role === "user" ? 4 : 0 }}>
+                  {m.role === "user" ? "you" : "sommelier"}
+                </div>
+              </>
+            )}
           </div>
         ))}
         {loading && (
@@ -189,9 +247,9 @@ export default function ChatTab({ syncKey }) {
             <button
               onClick={() => { setPendingImage(null); setPendingImageData(null); }}
               style={{ position: "absolute", top: -6, right: -6, width: 18, height: 18, borderRadius: "50%", background: C.red, border: "none", color: "#fff", fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}
-            >×</button>
+            >x</button>
           </div>
-          <div style={{ fontSize: 12, color: C.textDim, fontStyle: "italic" }}>Photo attached — add a message or just send</div>
+          <div style={{ fontSize: 12, color: C.textDim, fontStyle: "italic" }}>Photo attached</div>
         </div>
       )}
 
@@ -209,7 +267,7 @@ export default function ChatTab({ syncKey }) {
           {mode === "deep" ? "Deep" : "Quick"}
         </button>
         <span style={{ fontSize: 11, color: C.textFaint }}>
-          {mode === "deep" ? "Opus — thorough" : "Sonnet — fast"}
+          {mode === "deep" ? "Opus" : "Sonnet"}
         </span>
       </div>
 
