@@ -16,6 +16,7 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
   const [pendingImage, setPendingImage] = useState(null);
   const [pendingImageData, setPendingImageData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [streamingText, setStreamingText] = useState("");
   const [mode, setMode] = useState("deep");
 
   const models = {
@@ -25,9 +26,17 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
   const chatEndRef = useRef(null);
   const fileRef = useRef(null);
 
+  // Scroll to bottom on new messages or loading state change
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
+
+  // Scroll during streaming (throttled via React batching)
+  useEffect(() => {
+    if (streamingText) {
+      chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  }, [streamingText]);
 
   // Re-read messages from localStorage after cloud sync
   useEffect(() => {
@@ -45,8 +54,100 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
     }
   }, [messages]);
 
-  // API call helper with logging
-  const callAPI = useCallback(async (apiMessages, maxTokens = 4096) => {
+  // --- SSE Stream Parser ---
+  // Reads the fetch Response as an SSE stream, reconstructs the full message object,
+  // and calls onDelta for each text chunk so we can show streaming text in the UI.
+  const parseSSEStream = async (resp, onDelta) => {
+    const reader = resp.body.getReader();
+    const decoder = new TextDecoder();
+
+    const message = { content: [], stop_reason: null };
+    const contentBlocks = [];
+    const inputJsonBuffers = {}; // index -> accumulated partial JSON for tool_use inputs
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || ""; // keep incomplete line
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("event:")) continue;
+        if (!trimmed.startsWith("data: ")) continue;
+
+        const jsonStr = trimmed.slice(6);
+        try {
+          const event = JSON.parse(jsonStr);
+
+          switch (event.type) {
+            case "message_start":
+              message.id = event.message.id;
+              message.model = event.message.model;
+              break;
+
+            case "content_block_start":
+              contentBlocks[event.index] = { ...event.content_block };
+              if (event.content_block.type === "tool_use") {
+                inputJsonBuffers[event.index] = "";
+              }
+              break;
+
+            case "content_block_delta":
+              if (event.delta.type === "text_delta") {
+                contentBlocks[event.index].text =
+                  (contentBlocks[event.index].text || "") + event.delta.text;
+                if (onDelta) onDelta(event.delta.text);
+              } else if (event.delta.type === "input_json_delta") {
+                inputJsonBuffers[event.index] =
+                  (inputJsonBuffers[event.index] || "") + event.delta.partial_json;
+              }
+              break;
+
+            case "content_block_stop":
+              if (
+                contentBlocks[event.index]?.type === "tool_use" &&
+                inputJsonBuffers[event.index] != null
+              ) {
+                try {
+                  contentBlocks[event.index].input = JSON.parse(
+                    inputJsonBuffers[event.index] || "{}"
+                  );
+                } catch {
+                  console.error("[stream] Failed to parse tool input:", inputJsonBuffers[event.index]?.slice(0, 200));
+                  contentBlocks[event.index].input = {};
+                }
+              }
+              break;
+
+            case "message_delta":
+              if (event.delta?.stop_reason) {
+                message.stop_reason = event.delta.stop_reason;
+              }
+              break;
+
+            case "error":
+              throw new Error(event.error?.message || "Stream error from API");
+
+            default:
+              break; // ping, message_stop, etc.
+          }
+        } catch (e) {
+          if (e.message?.includes("Stream error")) throw e;
+          // Skip unparseable SSE lines
+        }
+      }
+    }
+
+    message.content = contentBlocks.filter(Boolean);
+    return message;
+  };
+
+  // --- API call helper (now streaming) ---
+  const callAPI = useCallback(async (apiMessages, maxTokens = 4096, onDelta) => {
     const requestBody = {
       model: models[mode],
       max_tokens: maxTokens,
@@ -60,7 +161,6 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
       max_tokens: requestBody.max_tokens,
       messageCount: apiMessages.length,
       toolCount: TOOL_DEFINITIONS.length,
-      lastMessage: apiMessages[apiMessages.length - 1],
     });
 
     const resp = await fetch("/api/chat", {
@@ -69,29 +169,38 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
       body: JSON.stringify(requestBody),
     });
 
-    const responseText = await resp.text();
-    let data;
-    try {
-      data = JSON.parse(responseText);
-    } catch (parseErr) {
-      console.error("[chat] Failed to parse API response:", responseText.slice(0, 500));
-      throw new Error(`API returned invalid JSON (status ${resp.status})`);
+    const contentType = resp.headers.get("content-type") || "";
+
+    // Non-streaming response (error from Netlify function or Anthropic)
+    if (!contentType.includes("text/event-stream")) {
+      const responseText = await resp.text();
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch {
+        console.error("[chat] Failed to parse response:", responseText.slice(0, 500));
+        throw new Error(`API returned invalid response (status ${resp.status})`);
+      }
+      if (data.error) {
+        const msg = typeof data.error === "string" ? data.error : data.error.message || JSON.stringify(data.error);
+        throw new Error(msg);
+      }
+      // Fallback: non-streaming response (shouldn't normally happen)
+      console.log("[chat] Non-streaming response (fallback):", { stop_reason: data.stop_reason });
+      return data;
     }
 
-    console.log("[chat] API response:", {
-      status: resp.status,
-      stop_reason: data.stop_reason,
-      contentTypes: data.content?.map(b => b.type),
-      error: data.error,
+    // Parse SSE stream
+    const message = await parseSSEStream(resp, onDelta);
+
+    console.log("[chat] Stream complete:", {
+      stop_reason: message.stop_reason,
+      contentTypes: message.content.map(b => b.type),
+      textLength: message.content.filter(b => b.type === "text").reduce((sum, b) => sum + (b.text?.length || 0), 0),
+      toolUseCount: message.content.filter(b => b.type === "tool_use").length,
     });
 
-    if (data.error) {
-      console.error("[chat] API error detail:", data.error);
-      const msg = typeof data.error === "string" ? data.error : data.error.message || JSON.stringify(data.error);
-      throw new Error(msg);
-    }
-
-    return data;
+    return message;
   }, [mode]);
 
   const sendMessage = useCallback(async () => {
@@ -106,6 +215,7 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
     setPendingImage(null);
     setPendingImageData(null);
     setLoading(true);
+    setStreamingText("");
 
     try {
       // Build API messages (exclude system tool confirmations)
@@ -129,8 +239,11 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
       let apiMessages = buildApiMessages(newMessages);
       const trimmed = apiMessages.length > 12 ? apiMessages.slice(-12) : apiMessages;
 
-      // Tool use loop
-      let response = await callAPI(trimmed);
+      // Initial call — stream text to UI
+      let response = await callAPI(trimmed, 4096, (delta) => {
+        setStreamingText(prev => prev + delta);
+      });
+
       let toolConfirmations = [];
       let loopMessages = [...trimmed];
       let loops = 0;
@@ -161,25 +274,20 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
             const result = executeToolCall(block.name, block.input);
             console.log(`[chat] Tool ${block.name} result:`, { success: result.success, message: result.message, hasData: !!result.data });
 
-            // For tool results with large data (read_section), truncate if needed
+            // For tool results with large data, truncate if needed
             let resultContent = JSON.stringify(result);
             if (resultContent.length > 50000) {
-              console.warn(`[chat] Tool result very large (${resultContent.length} chars), truncating data`);
-              const truncated = { ...result, data: result.data, _note: "Full data included" };
-              resultContent = JSON.stringify(truncated);
-              // If still too large, summarize
-              if (resultContent.length > 50000) {
-                const summary = {
-                  success: result.success,
-                  message: result.message,
-                  entryCount: Array.isArray(result.data) ? result.data.length : "object",
-                  entries: Array.isArray(result.data)
-                    ? result.data.map(e => ({ name: e.name || e.wine || e.flag || e.text, ...(e.safety && { safety: e.safety }), ...(e.tier && { tier: e.tier }) }))
-                    : result.data,
-                };
-                resultContent = JSON.stringify(summary);
-                console.log(`[chat] Summarized to ${resultContent.length} chars`);
-              }
+              console.warn(`[chat] Tool result very large (${resultContent.length} chars), summarizing`);
+              const summary = {
+                success: result.success,
+                message: result.message,
+                entryCount: Array.isArray(result.data) ? result.data.length : "object",
+                entries: Array.isArray(result.data)
+                  ? result.data.map(e => ({ name: e.name || e.wine || e.flag || e.text, ...(e.safety && { safety: e.safety }), ...(e.tier && { tier: e.tier }) }))
+                  : result.data,
+              };
+              resultContent = JSON.stringify(summary);
+              console.log(`[chat] Summarized to ${resultContent.length} chars`);
             }
 
             toolResults.push({
@@ -214,17 +322,21 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
           { role: "user", content: toolResults },
         ];
 
-        // Use higher token limit for tool loop follow-ups (AI may need to generate large rewrite payloads)
-        response = await callAPI(loopMessages, 8192);
+        // Clear streaming text before next API call
+        setStreamingText("");
+
+        // Use higher token limit for tool loop follow-ups
+        response = await callAPI(loopMessages, 8192, (delta) => {
+          setStreamingText(prev => prev + delta);
+        });
       }
 
       if (loops >= MAX_TOOL_LOOPS) {
         console.warn("[chat] Hit max tool loop limit");
       }
 
-      // Handle stop_reason === "max_tokens" — the response was cut off
       if (response.stop_reason === "max_tokens") {
-        console.warn("[chat] Response truncated (max_tokens). Content:", response.content);
+        console.warn("[chat] Response truncated (max_tokens).");
       }
 
       // Extract text from final response
@@ -241,7 +353,6 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
 
       if (!replyText) {
         console.warn("[chat] No text in final response. stop_reason:", response.stop_reason, "content:", response.content);
-        // If we got tool confirmations but no final text, provide a fallback
         if (toolConfirmations.length > 0) {
           replyText = "Done.";
         } else {
@@ -264,6 +375,7 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
       console.error("[chat] sendMessage error:", err);
       setMessages(prev => [...prev, { role: "assistant", text: `Error: ${err.message}` }]);
     }
+    setStreamingText("");
     setLoading(false);
   }, [input, pendingImageData, pendingImage, messages, mode, callAPI, onDataUpdated]);
 
@@ -333,18 +445,47 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
             )}
           </div>
         ))}
+
+        {/* Loading / streaming indicator */}
         {loading && (
           <div style={{ padding: "4px 0" }}>
-            <div style={{ maxWidth: "85%", padding: "14px 16px", borderRadius: "18px 18px 18px 4px", background: C.chatBot, border: `1px solid ${C.border}`, boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}>
-              <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
-                {[0, 1, 2].map(d => (
-                  <div key={d} style={{
-                    width: 8, height: 8, borderRadius: "50%", background: C.accent,
-                    animation: `dotPulse 1.2s ${d * 0.2}s infinite`,
+            <div style={{
+              maxWidth: "85%",
+              padding: "14px 16px",
+              borderRadius: "18px 18px 18px 4px",
+              background: C.chatBot,
+              border: `1px solid ${C.border}`,
+              boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+            }}>
+              {streamingText ? (
+                <div style={{ fontSize: 14, lineHeight: 1.6, color: C.text, whiteSpace: "pre-wrap" }}>
+                  {streamingText}
+                  <span style={{
+                    display: "inline-block",
+                    width: 2,
+                    height: 14,
+                    background: C.accent,
+                    marginLeft: 1,
+                    verticalAlign: "text-bottom",
+                    animation: "cursorBlink 0.8s step-end infinite",
                   }} />
-                ))}
-              </div>
+                </div>
+              ) : (
+                <div style={{ display: "flex", gap: 5, alignItems: "center" }}>
+                  {[0, 1, 2].map(d => (
+                    <div key={d} style={{
+                      width: 8, height: 8, borderRadius: "50%", background: C.accent,
+                      animation: `dotPulse 1.2s ${d * 0.2}s infinite`,
+                    }} />
+                  ))}
+                </div>
+              )}
             </div>
+            {streamingText && (
+              <div style={{ fontSize: 9, color: C.textFaint, marginTop: 2, paddingLeft: 4 }}>
+                sommelier
+              </div>
+            )}
           </div>
         )}
         <div ref={chatEndRef} />
@@ -417,6 +558,10 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
         @keyframes dotPulse {
           0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
           40% { opacity: 1; transform: scale(1); }
+        }
+        @keyframes cursorBlink {
+          0%, 50% { opacity: 1; }
+          51%, 100% { opacity: 0; }
         }
       `}</style>
     </div>

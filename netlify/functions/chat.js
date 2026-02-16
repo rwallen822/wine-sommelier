@@ -14,6 +14,10 @@ export default async (req) => {
   try {
     const body = await req.json();
 
+    // Force streaming to prevent Netlify function inactivity timeout.
+    // The SSE chunks keep the connection alive so the 10s idle limit is never hit.
+    body.stream = true;
+
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -24,11 +28,22 @@ export default async (req) => {
       body: JSON.stringify(body),
     });
 
-    const data = await response.json();
+    // If Anthropic returned an error, pass it through as JSON
+    if (!response.ok) {
+      const errorBody = await response.text();
+      return new Response(errorBody, {
+        status: response.status,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
 
-    return new Response(JSON.stringify(data), {
-      status: response.status,
-      headers: { "Content-Type": "application/json" },
+    // Stream the SSE response through to the client
+    return new Response(response.body, {
+      status: 200,
+      headers: {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+      },
     });
   } catch (error) {
     return new Response(JSON.stringify({ error: "Failed to call API" }), {
