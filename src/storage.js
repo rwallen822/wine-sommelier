@@ -95,6 +95,17 @@ export async function pullFromCloud() {
       updated = true;
     }
 
+    // After pulling, push local data to cloud so all devices share everything
+    // This ensures pre-existing data (from before sync was added) gets uploaded
+    const localAfter = {
+      messages: getMessages(),
+      tastings: getTastingLog(),
+      palate: getPalateNotes(),
+    };
+    if (localAfter.messages.length > 0 || localAfter.tastings.length > 0 || localAfter.palate.length > 0) {
+      await pushToCloud();
+    }
+
     return updated;
   } catch (err) {
     console.warn("Cloud sync error:", err);
