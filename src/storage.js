@@ -319,12 +319,18 @@ export function getGrapes() {
 export function upsertGrape(grape) {
   const grapes = getGrapes();
   const idx = grapes.findIndex(g => g.name.toLowerCase() === grape.name.toLowerCase());
-  const entry = { ...grape, source: "chat", updatedAt: new Date().toISOString() };
+  const entry = { ...grape, source: grape.source || "chat", updatedAt: new Date().toISOString() };
   if (idx >= 0) grapes[idx] = { ...grapes[idx], ...entry };
   else grapes.push(entry);
   setJSON(KEYS.grapes, grapes);
   scheduleCloudSync();
   return entry;
+}
+
+export function deleteGrape(name) {
+  const grapes = getGrapes().filter(g => g.name.toLowerCase() !== name.toLowerCase());
+  setJSON(KEYS.grapes, grapes);
+  scheduleCloudSync();
 }
 
 // --- Regions ---
@@ -335,12 +341,18 @@ export function getRegions() {
 export function upsertRegion(region) {
   const regions = getRegions();
   const idx = regions.findIndex(r => r.name.toLowerCase() === region.name.toLowerCase());
-  const entry = { ...region, source: "chat", updatedAt: new Date().toISOString() };
+  const entry = { ...region, source: region.source || "chat", updatedAt: new Date().toISOString() };
   if (idx >= 0) regions[idx] = { ...regions[idx], ...entry };
   else regions.push(entry);
   setJSON(KEYS.regions, regions);
   scheduleCloudSync();
   return entry;
+}
+
+export function deleteRegion(name) {
+  const regions = getRegions().filter(r => r.name.toLowerCase() !== name.toLowerCase());
+  setJSON(KEYS.regions, regions);
+  scheduleCloudSync();
 }
 
 // --- Labels ---
@@ -353,12 +365,20 @@ export function upsertLabelTip(tip) {
   const arr = labels[tip.type];
   if (!arr) return null;
   const idx = arr.findIndex(t => t.flag.toLowerCase() === tip.flag.toLowerCase());
-  const entry = { flag: tip.flag, detail: tip.detail, source: "chat", updatedAt: new Date().toISOString() };
+  const entry = { flag: tip.flag, detail: tip.detail, source: tip.source || "chat", updatedAt: new Date().toISOString() };
   if (idx >= 0) arr[idx] = { ...arr[idx], ...entry };
   else arr.push(entry);
   setJSON(KEYS.labels, labels);
   scheduleCloudSync();
   return entry;
+}
+
+export function deleteLabelTip(type, flag) {
+  const labels = getLabels();
+  if (!labels[type]) return;
+  labels[type] = labels[type].filter(t => t.flag.toLowerCase() !== flag.toLowerCase());
+  setJSON(KEYS.labels, labels);
+  scheduleCloudSync();
 }
 
 // --- Cellar ---
@@ -371,12 +391,28 @@ export function addCellarEntry(entry) {
   log.push({
     ...entry,
     date: entry.date || new Date().toISOString().split("T")[0],
-    source: "chat",
-    id: Date.now().toString(),
+    source: entry.source || "chat",
+    id: entry.id || Date.now().toString(),
   });
   setJSON(KEYS.cellar, log);
   scheduleCloudSync();
   return entry;
+}
+
+export function updateCellarEntry(id, updates) {
+  const log = getCellar();
+  const idx = log.findIndex(t => t.id === id);
+  if (idx >= 0) {
+    log[idx] = { ...log[idx], ...updates, updatedAt: new Date().toISOString() };
+    setJSON(KEYS.cellar, log);
+    scheduleCloudSync();
+  }
+}
+
+export function deleteCellarEntry(id) {
+  const log = getCellar().filter(t => t.id !== id);
+  setJSON(KEYS.cellar, log);
+  scheduleCloudSync();
 }
 
 // --- Palate Notes ---
@@ -394,6 +430,15 @@ export function addPalateNote(note, date) {
   setJSON(KEYS.palateNotes, notes);
   scheduleCloudSync();
   return { text: note, date };
+}
+
+export function deletePalateNote(index) {
+  const notes = getPalateNotes();
+  if (index >= 0 && index < notes.length) {
+    notes.splice(index, 1);
+    setJSON(KEYS.palateNotes, notes);
+    scheduleCloudSync();
+  }
 }
 
 // --- Export / Clear ---
