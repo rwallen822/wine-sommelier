@@ -89,8 +89,8 @@ export async function pullFromCloud() {
       }
     }
 
-    // Messages: use cloud if local is empty
-    if (localMessages.length === 0 && cloud.messages?.length > 0) {
+    // Messages: use cloud if cloud has more (local may just have the default greeting)
+    if (cloud.messages?.length > localMessages.length) {
       setJSON(KEYS.messages, cloud.messages);
       updated = true;
     }
