@@ -164,7 +164,42 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
     return message;
   };
 
-  // --- API call helper (now streaming) ---
+  // --- Compact old tool results to reduce token usage in multi-step tool loops ---
+  // Replaces full data in earlier tool_result messages with short summaries.
+  // The AI already consumed the data in previous iterations, so it only needs
+  // the most recent tool result in full.
+  const compactToolHistory = (messages) => {
+    // Find indices of user messages containing tool_result blocks
+    const toolResultIndices = [];
+    for (let i = 0; i < messages.length; i++) {
+      const msg = messages[i];
+      if (msg.role === "user" && Array.isArray(msg.content) && msg.content.some(b => b.type === "tool_result")) {
+        toolResultIndices.push(i);
+      }
+    }
+    // Nothing to compact if 1 or fewer tool result messages
+    if (toolResultIndices.length <= 1) return messages;
+
+    // Compact all but the most recent tool_result message
+    const lastIdx = toolResultIndices[toolResultIndices.length - 1];
+    return messages.map((msg, i) => {
+      if (!toolResultIndices.includes(i) || i === lastIdx) return msg;
+      return {
+        ...msg,
+        content: msg.content.map(block => {
+          if (block.type !== "tool_result") return block;
+          try {
+            const parsed = JSON.parse(block.content);
+            return { ...block, content: JSON.stringify({ success: parsed.success, message: parsed.message }) };
+          } catch {
+            return { ...block, content: JSON.stringify({ success: true, message: "(compacted)" }) };
+          }
+        }),
+      };
+    });
+  };
+
+  // --- API call helper (now streaming, with 429 retry) ---
   const callAPI = useCallback(async (apiMessages, maxTokens = 4096, onDelta) => {
     const requestBody = {
       model: models[mode],
@@ -181,11 +216,21 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
       toolCount: TOOL_DEFINITIONS.length,
     });
 
-    const resp = await fetch("/api/chat", {
+    const doFetch = () => fetch("/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(requestBody),
     });
+
+    let resp = await doFetch();
+
+    // Auto-retry once on 429 (rate limit) after a short wait
+    if (resp.status === 429) {
+      const wait = Math.min(parseInt(resp.headers.get("retry-after") || "8", 10), 30);
+      console.warn(`[chat] Rate limited (429). Waiting ${wait}s before retry...`);
+      await new Promise(r => setTimeout(r, wait * 1000));
+      resp = await doFetch();
+    }
 
     const contentType = resp.headers.get("content-type") || "";
 
@@ -343,8 +388,12 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
         // Clear streaming text before next API call
         setStreamingText("");
 
+        // Compact older tool results to keep token count low
+        const compacted = compactToolHistory(loopMessages);
+        console.log(`[chat] Compacted tool history: ${loopMessages.length} msgs, trimmed old results`);
+
         // Use higher token limit for tool loop follow-ups
-        response = await callAPI(loopMessages, 8192, (delta) => {
+        response = await callAPI(compacted, 8192, (delta) => {
           setStreamingText(prev => prev + delta);
         });
       }
