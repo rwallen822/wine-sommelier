@@ -66,83 +66,101 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
     const inputJsonBuffers = {}; // index -> accumulated partial JSON for tool_use inputs
     let buffer = "";
 
+    // Process a single SSE line
+    const processLine = (line) => {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("event:")) return;
+      if (!trimmed.startsWith("data: ")) return;
+
+      const jsonStr = trimmed.slice(6);
+      try {
+        const event = JSON.parse(jsonStr);
+
+        switch (event.type) {
+          case "message_start":
+            message.id = event.message.id;
+            message.model = event.message.model;
+            break;
+
+          case "content_block_start":
+            contentBlocks[event.index] = { ...event.content_block };
+            if (event.content_block.type === "tool_use") {
+              inputJsonBuffers[event.index] = "";
+            }
+            break;
+
+          case "content_block_delta":
+            if (event.delta.type === "text_delta") {
+              contentBlocks[event.index].text =
+                (contentBlocks[event.index].text || "") + event.delta.text;
+              if (onDelta) onDelta(event.delta.text);
+            } else if (event.delta.type === "input_json_delta") {
+              inputJsonBuffers[event.index] =
+                (inputJsonBuffers[event.index] || "") + event.delta.partial_json;
+            }
+            break;
+
+          case "content_block_stop":
+            if (
+              contentBlocks[event.index]?.type === "tool_use" &&
+              inputJsonBuffers[event.index] != null
+            ) {
+              try {
+                contentBlocks[event.index].input = JSON.parse(
+                  inputJsonBuffers[event.index] || "{}"
+                );
+              } catch {
+                console.error("[stream] Failed to parse tool input:", inputJsonBuffers[event.index]?.slice(0, 200));
+                contentBlocks[event.index].input = {};
+              }
+            }
+            break;
+
+          case "message_delta":
+            if (event.delta?.stop_reason) {
+              message.stop_reason = event.delta.stop_reason;
+            }
+            break;
+
+          case "error":
+            throw new Error(event.error?.message || "Stream error from API");
+
+          default:
+            break; // ping, message_stop, etc.
+        }
+      } catch (e) {
+        if (e.message?.includes("Stream error")) throw e;
+        // Skip unparseable SSE lines
+      }
+    };
+
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
+      if (done) {
+        // Flush decoder and process any remaining data in buffer
+        buffer += decoder.decode();
+        if (buffer.trim()) {
+          const remaining = buffer.split("\n");
+          for (const line of remaining) processLine(line);
+        }
+        break;
+      }
 
       buffer += decoder.decode(value, { stream: true });
       const lines = buffer.split("\n");
-      buffer = lines.pop() || ""; // keep incomplete line
+      buffer = lines.pop() || ""; // keep incomplete line in buffer
 
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith("event:")) continue;
-        if (!trimmed.startsWith("data: ")) continue;
-
-        const jsonStr = trimmed.slice(6);
-        try {
-          const event = JSON.parse(jsonStr);
-
-          switch (event.type) {
-            case "message_start":
-              message.id = event.message.id;
-              message.model = event.message.model;
-              break;
-
-            case "content_block_start":
-              contentBlocks[event.index] = { ...event.content_block };
-              if (event.content_block.type === "tool_use") {
-                inputJsonBuffers[event.index] = "";
-              }
-              break;
-
-            case "content_block_delta":
-              if (event.delta.type === "text_delta") {
-                contentBlocks[event.index].text =
-                  (contentBlocks[event.index].text || "") + event.delta.text;
-                if (onDelta) onDelta(event.delta.text);
-              } else if (event.delta.type === "input_json_delta") {
-                inputJsonBuffers[event.index] =
-                  (inputJsonBuffers[event.index] || "") + event.delta.partial_json;
-              }
-              break;
-
-            case "content_block_stop":
-              if (
-                contentBlocks[event.index]?.type === "tool_use" &&
-                inputJsonBuffers[event.index] != null
-              ) {
-                try {
-                  contentBlocks[event.index].input = JSON.parse(
-                    inputJsonBuffers[event.index] || "{}"
-                  );
-                } catch {
-                  console.error("[stream] Failed to parse tool input:", inputJsonBuffers[event.index]?.slice(0, 200));
-                  contentBlocks[event.index].input = {};
-                }
-              }
-              break;
-
-            case "message_delta":
-              if (event.delta?.stop_reason) {
-                message.stop_reason = event.delta.stop_reason;
-              }
-              break;
-
-            case "error":
-              throw new Error(event.error?.message || "Stream error from API");
-
-            default:
-              break; // ping, message_stop, etc.
-          }
-        } catch (e) {
-          if (e.message?.includes("Stream error")) throw e;
-          // Skip unparseable SSE lines
-        }
-      }
+      for (const line of lines) processLine(line);
     }
 
     message.content = contentBlocks.filter(Boolean);
+
+    // Fallback: if stop_reason is null but content has tool_use blocks, infer it
+    if (!message.stop_reason && message.content.some(b => b.type === "tool_use")) {
+      console.warn("[stream] stop_reason was null but tool_use blocks found — inferring stop_reason: tool_use");
+      message.stop_reason = "tool_use";
+    }
+
     return message;
   };
 
