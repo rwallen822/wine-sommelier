@@ -90,15 +90,15 @@ function App() {
     if (id !== "chat") window.scrollTo(0, 0);
   };
 
-  const safetyColor = (s) => s === "always" ? C.green : s === "sometimes" ? C.gold : C.red;
+  const safetyColor = (s) => s === "always" ? C.green : s === "sometimes" ? C.yellow : C.red;
   const safetyBg = (s) => s === "always" ? C.greenBg : s === "sometimes" ? C.yellowBg : C.redBg;
 
   const tierColor = (t) => {
     switch (t) {
-      case "goldmine": return C.gold;
+      case "goldmine": return C.green;
       case "good": return C.green;
-      case "splurge": return C.accentLight;
-      case "caution": return C.yellow || C.gold;
+      case "splurge": return C.yellow;
+      case "caution": return C.yellow;
       case "avoid": return C.red;
       default: return C.textDim;
     }
@@ -116,8 +116,8 @@ function App() {
 
   const verdictColor = (v) => {
     switch (v) {
-      case "loved": return C.gold;
-      case "liked": return C.green;
+      case "loved": return C.green;
+      case "liked": return C.yellow;
       case "neutral": return C.textDim;
       case "disliked": return C.red;
       case "experiment": return C.accent;
@@ -130,9 +130,9 @@ function App() {
 
   const priorityColor = (p) => {
     switch (p) {
-      case "must-buy": return C.red;
-      case "try-if-you-see-it": return C.gold;
-      case "worth-exploring": return C.green;
+      case "must-buy": return C.green;
+      case "try-if-you-see-it": return C.yellow;
+      case "worth-exploring": return C.red;
       default: return C.textDim;
     }
   };
@@ -440,7 +440,7 @@ function App() {
           const isAdding = adding?.tab === "grapes";
           return (
             <div>
-              <div style={{ fontSize: 11, letterSpacing: 3, color: C.goldDim, textTransform: "uppercase", marginBottom: 16 }}>Grape Variety Guide</div>
+              <div style={{ fontSize: 11, letterSpacing: 3, color: C.textDim, textTransform: "uppercase", marginBottom: 16 }}>Grape Variety Guide</div>
 
               {isAdding ? (
                 <GrapeForm onCancel={cancelEdit} onSave={(data) => { upsertGrape(data); setAdding(null); bump(); }} />
@@ -487,7 +487,7 @@ function App() {
                 );
               })}
               <div style={{ padding: 14, background: C.card, borderRadius: 10, border: `1px solid ${C.border}`, marginTop: 8 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: C.gold, marginBottom: 6 }}>The Rule</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: C.accent, marginBottom: 6 }}>The Rule</div>
                 <div style={{ fontSize: 12.5, color: C.textDim, lineHeight: 1.6, fontStyle: "italic" }}>Thin-skinned, aromatic, high-acid grapes = transparent wines with lift. Thick-skinned grapes = heavy, extracted, jammy.</div>
               </div>
             </div>
@@ -503,7 +503,7 @@ function App() {
 
           return (
             <div>
-              <div style={{ fontSize: 11, letterSpacing: 3, color: C.goldDim, textTransform: "uppercase", marginBottom: 16 }}>Region Guide</div>
+              <div style={{ fontSize: 11, letterSpacing: 3, color: C.textDim, textTransform: "uppercase", marginBottom: 16 }}>Region Guide</div>
 
               {isAdding ? (
                 <RegionForm onCancel={cancelEdit} onSave={(data) => { upsertRegion(data); setAdding(null); bump(); }} />
@@ -531,7 +531,7 @@ function App() {
                             <div style={{ fontSize: 15, fontWeight: 600, color: C.text, flex: 1 }}>{r.name}</div>
                             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                               {chatBadge(r.source)}
-                              {r.price && <span style={{ fontSize: 12, color: C.gold, fontWeight: 500 }}>{r.price}</span>}
+                              {r.price && <span style={{ fontSize: 12, color: C.accent, fontWeight: 500 }}>{r.price}</span>}
                               {cardActions(editKey, () => { cancelEdit(); setEditing({ tab: "regions", id: r.name, data: r }); setExpandedRegion(r.name); })}
                             </div>
                           </div>
@@ -549,21 +549,21 @@ function App() {
 
                               {r.soils && (
                                 <div style={{ marginBottom: 8 }}>
-                                  <div style={{ fontSize: 11, fontWeight: 600, color: C.gold, marginBottom: 4, textTransform: "uppercase", letterSpacing: 1 }}>Terroir</div>
+                                  <div style={{ fontSize: 11, fontWeight: 600, color: C.accent, marginBottom: 4, textTransform: "uppercase", letterSpacing: 1 }}>Terroir</div>
                                   <div style={{ fontSize: 12, color: C.textDim, lineHeight: 1.5 }}>{r.soils}</div>
                                 </div>
                               )}
 
                               {r.subEntries?.length > 0 && (
                                 <div style={{ marginBottom: 8 }}>
-                                  <div style={{ fontSize: 11, fontWeight: 600, color: C.gold, marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>Appellations</div>
+                                  <div style={{ fontSize: 11, fontWeight: 600, color: C.accent, marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>Appellations</div>
                                   {r.subEntries.map((sub, i) => (
-                                    <div key={i} style={{ padding: "8px 10px", marginBottom: 4, background: C.bg, borderRadius: 6, borderLeft: `2px solid ${sub.rank && sub.rank <= 2 ? C.gold : C.border}` }}>
+                                    <div key={i} style={{ padding: "8px 10px", marginBottom: 4, background: C.bg, borderRadius: 6, borderLeft: `2px solid ${sub.rank && sub.rank <= 2 ? C.accent : C.border}` }}>
                                       <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>
                                         {sub.rank ? `#${sub.rank} ` : ""}{sub.name}
                                       </div>
                                       <div style={{ fontSize: 11.5, color: C.textDim, lineHeight: 1.5, marginTop: 2 }}>{sub.note}</div>
-                                      {sub.picks && <div style={{ fontSize: 11, color: C.gold, marginTop: 3 }}>Look for: {sub.picks}</div>}
+                                      {sub.picks && <div style={{ fontSize: 11, color: C.accent, marginTop: 3 }}>Look for: {sub.picks}</div>}
                                     </div>
                                   ))}
                                 </div>
@@ -571,12 +571,12 @@ function App() {
 
                               {r.vintages?.length > 0 && (
                                 <div>
-                                  <div style={{ fontSize: 11, fontWeight: 600, color: C.gold, marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>Vintage Guide</div>
+                                  <div style={{ fontSize: 11, fontWeight: 600, color: C.accent, marginBottom: 6, textTransform: "uppercase", letterSpacing: 1 }}>Vintage Guide</div>
                                   {r.vintages.map((v, i) => (
                                     <div key={i} style={{ padding: "6px 10px", marginBottom: 3, background: C.bg, borderRadius: 6, display: "flex", gap: 8, alignItems: "flex-start" }}>
-                                      <div style={{ fontSize: 13, fontWeight: 600, color: C.gold, minWidth: 36 }}>{v.year}</div>
+                                      <div style={{ fontSize: 13, fontWeight: 600, color: C.accent, minWidth: 36 }}>{v.year}</div>
                                       <div>
-                                        <div style={{ fontSize: 12, fontWeight: 600, color: v.verdict?.includes("YOUR") ? C.gold : C.text }}>{v.verdict}</div>
+                                        <div style={{ fontSize: 12, fontWeight: 600, color: v.verdict?.includes("YOUR") ? C.accent : C.text }}>{v.verdict}</div>
                                         {v.detail && <div style={{ fontSize: 11, color: C.textDim, lineHeight: 1.4, marginTop: 1 }}>{v.detail}</div>}
                                       </div>
                                     </div>
@@ -603,7 +603,7 @@ function App() {
 
           return (
             <div>
-              <div style={{ fontSize: 11, letterSpacing: 3, color: C.goldDim, textTransform: "uppercase", marginBottom: 16 }}>Label Reading Cheat Sheet</div>
+              <div style={{ fontSize: 11, letterSpacing: 3, color: C.textDim, textTransform: "uppercase", marginBottom: 16 }}>Label Reading Cheat Sheet</div>
 
               {/* Green Flags */}
               <div style={{ marginBottom: 20 }}>
@@ -733,7 +733,7 @@ function App() {
                 <div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 12 }}>
                     <div>
-                      <div style={{ fontSize: 11, letterSpacing: 3, color: C.goldDim, textTransform: "uppercase" }}>Tasting Log</div>
+                      <div style={{ fontSize: 11, letterSpacing: 3, color: C.textDim, textTransform: "uppercase" }}>Tasting Log</div>
                       <div style={{ fontSize: 20, fontWeight: 500, color: C.text, marginTop: 2 }}>My Cellar</div>
                     </div>
                     <div style={{ fontSize: 12, color: C.textDim }}>{sorted.length} wines</div>
@@ -743,7 +743,7 @@ function App() {
                   <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
                     <button onClick={() => setCellarSort("date")} style={{ padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600, background: cellarSort === "date" ? C.accent : C.card, color: cellarSort === "date" ? "#fff" : C.textDim, border: `1px solid ${cellarSort === "date" ? C.accent : C.border}`, cursor: "pointer" }}>Newest</button>
                     <button onClick={() => setCellarSort("rating")} style={{ padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600, background: cellarSort === "rating" ? C.accent : C.card, color: cellarSort === "rating" ? "#fff" : C.textDim, border: `1px solid ${cellarSort === "rating" ? C.accent : C.border}`, cursor: "pointer" }}>Top Rated</button>
-                    <button onClick={handleExport} style={{ marginLeft: "auto", padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 500, background: C.card, color: C.gold, border: `1px solid ${C.border}`, cursor: "pointer" }}>Export</button>
+                    <button onClick={handleExport} style={{ marginLeft: "auto", padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 500, background: C.card, color: C.accent, border: `1px solid ${C.border}`, cursor: "pointer" }}>Export</button>
                   </div>
 
                   {/* Verdict filter pills */}
@@ -790,7 +790,7 @@ function App() {
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                           <div style={{ fontSize: 15, fontWeight: 600, color: C.text, flex: 1 }}>{t.wine}</div>
                           <div style={{ display: "flex", gap: 8, alignItems: "center", marginLeft: 8, flexShrink: 0 }}>
-                            {t.rating && <div style={{ fontSize: 16, fontWeight: 700, color: C.gold }}>{t.rating}</div>}
+                            {t.rating && <div style={{ fontSize: 16, fontWeight: 700, color: C.accent }}>{t.rating}</div>}
                             <div style={{
                               fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 10,
                               background: verdictColor(t.verdict), color: "#fff", textTransform: "uppercase", whiteSpace: "nowrap",
@@ -823,9 +823,9 @@ function App() {
                   {/* Palate Notes */}
                   {palateNotes.length > 0 && (
                     <div style={{ marginTop: 24 }}>
-                      <div style={{ fontSize: 12, fontWeight: 600, color: C.gold, marginBottom: 10, letterSpacing: 1, textTransform: "uppercase" }}>Palate Evolution</div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: C.accent, marginBottom: 10, letterSpacing: 1, textTransform: "uppercase" }}>Palate Evolution</div>
                       {palateNotes.map((n, i) => (
-                        <div key={i} style={{ padding: "10px 12px", marginBottom: 5, background: C.accentGlow, borderRadius: 8, borderLeft: `3px solid ${C.gold}`, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                        <div key={i} style={{ padding: "10px 12px", marginBottom: 5, background: C.accentGlow, borderRadius: 8, borderLeft: `3px solid ${C.accent}`, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
                           <div style={{ flex: 1 }}>
                             <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>{n.text}</div>
                             <div style={{ fontSize: 10, color: C.textFaint, marginTop: 4 }}>{n.date}</div>
@@ -850,7 +850,7 @@ function App() {
                 <div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 12 }}>
                     <div>
-                      <div style={{ fontSize: 11, letterSpacing: 3, color: C.goldDim, textTransform: "uppercase" }}>Shopping List</div>
+                      <div style={{ fontSize: 11, letterSpacing: 3, color: C.textDim, textTransform: "uppercase" }}>Shopping List</div>
                       <div style={{ fontSize: 20, fontWeight: 500, color: C.text, marginTop: 2 }}>Hunt List</div>
                     </div>
                     <div style={{ fontSize: 12, color: C.textDim }}>{huntList.length} wines</div>
@@ -871,7 +871,7 @@ function App() {
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                           <div style={{ fontSize: 15, fontWeight: 600, color: C.text, flex: 1 }}>{h.wine}</div>
                           <div style={{ display: "flex", gap: 8, alignItems: "center", marginLeft: 8, flexShrink: 0 }}>
-                            {h.priceRange && <span style={{ fontSize: 12, color: C.gold, fontWeight: 500 }}>{h.priceRange}</span>}
+                            {h.priceRange && <span style={{ fontSize: 12, color: C.accent, fontWeight: 500 }}>{h.priceRange}</span>}
                             <div style={{
                               fontSize: 9, fontWeight: 600, padding: "2px 8px", borderRadius: 10,
                               background: priorityColor(h.priority), color: "#fff", textTransform: "uppercase", whiteSpace: "nowrap",

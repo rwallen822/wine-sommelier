@@ -10,11 +10,6 @@ export const C = {
   accentLight: "#9B4D54",
   accentGlow: "rgba(114, 47, 55, 0.08)",
 
-  // Modern gold/amber
-  gold: "#B8860B",
-  goldDim: "#D4A84B",
-  goldBg: "rgba(184, 134, 11, 0.08)",
-
   // Text
   text: "#1A1A1A",
   textDim: "#666666",
