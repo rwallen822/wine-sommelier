@@ -9,7 +9,7 @@ import {
   getCellar, addCellarEntry, updateCellarEntry, deleteCellarEntry,
   getPalateNotes, deletePalateNote,
   getHuntList, removeHuntListEntry,
-  exportAllData, pullFromCloud, migrateToV2,
+  exportAllData, pullFromCloud, migrateToV2, migrateLabelsV2,
 } from "./storage";
 
 // --- Shared styles ---
@@ -65,6 +65,7 @@ function App() {
 
   useEffect(() => {
     migrateToV2();
+    migrateLabelsV2();
     pullFromCloud().then((updated) => {
       if (updated) setSyncKey(k => k + 1);
     });

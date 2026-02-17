@@ -11,6 +11,7 @@ const KEYS = {
   huntList: "wine-sommelier:huntList",
   lastSync: "wine-sommelier:lastSync",
   migrated: "wine-sommelier:v2-migrated",
+  labelsOverhauled: "wine-sommelier:labels-v2",
 };
 
 const OLD_KEYS = {
@@ -136,6 +137,38 @@ export function migrateToV2() {
   // 7. Set flag + clean up old keys
   setJSON(KEYS.migrated, true);
   Object.values(OLD_KEYS).forEach(k => localStorage.removeItem(k));
+}
+
+// --- Labels V2 Migration (overhaul with comprehensive content) ---
+export function migrateLabelsV2() {
+  if (getJSON(KEYS.labelsOverhauled)) return;
+
+  const current = getLabels();
+
+  // Keep any user-added labels (source === "chat"), drop old static ones
+  const userGreen = current.green.filter(t => t.source === "chat");
+  const userRed = current.red.filter(t => t.source === "chat");
+
+  // Seed fresh from updated LABEL_TIPS
+  const newGreen = LABEL_TIPS.green.map(t => ({ ...t, source: "static" }));
+  const newRed = LABEL_TIPS.red.map(t => ({ ...t, source: "static" }));
+
+  // Merge: new static entries first, then user entries (deduped by flag)
+  const mergedGreen = [...newGreen];
+  for (const u of userGreen) {
+    if (!mergedGreen.some(g => g.flag.toLowerCase() === u.flag.toLowerCase())) {
+      mergedGreen.push(u);
+    }
+  }
+  const mergedRed = [...newRed];
+  for (const u of userRed) {
+    if (!mergedRed.some(r => r.flag.toLowerCase() === u.flag.toLowerCase())) {
+      mergedRed.push(u);
+    }
+  }
+
+  setJSON(KEYS.labels, { green: mergedGreen, red: mergedRed });
+  setJSON(KEYS.labelsOverhauled, true);
 }
 
 // --- Cloud Sync ---
