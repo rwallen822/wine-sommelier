@@ -8,6 +8,7 @@ const KEYS = {
   labels: "wine-sommelier:labels",
   cellar: "wine-sommelier:cellar",
   palateNotes: "wine-sommelier:palateNotes",
+  huntList: "wine-sommelier:huntList",
   lastSync: "wine-sommelier:lastSync",
   migrated: "wine-sommelier:v2-migrated",
 };
@@ -156,6 +157,7 @@ async function pushToCloud() {
       labels: getLabels(),
       cellar: getCellar(),
       palateNotes: getPalateNotes(),
+      huntList: getHuntList(),
     };
     console.log("[sync] pushing to cloud:", payload.chatHistory.length, "msgs,", payload.cellar.length, "cellar,", payload.grapes.length, "grapes");
     const resp = await fetch("/api/sync-save", {
@@ -223,6 +225,7 @@ export async function pullFromCloud() {
       if (cloud.labels) { setJSON(KEYS.labels, cloud.labels); updated = true; }
       if (cloud.cellar) { setJSON(KEYS.cellar, cloud.cellar); updated = true; }
       if (cloud.palateNotes) { setJSON(KEYS.palateNotes, cloud.palateNotes); updated = true; }
+      if (cloud.huntList) { setJSON(KEYS.huntList, cloud.huntList); updated = true; }
       const cloudMessages = cloud.chatHistory || cloud.messages || [];
       if (cloudMessages.length > 0) { setJSON(KEYS.messages, cloudMessages); updated = true; }
       setJSON(KEYS.lastSync, new Date().toISOString());
@@ -292,6 +295,17 @@ export async function pullFromCloud() {
       const newNotes = cloud.palateNotes.filter(n => !existingKeys.has(`${n.text}|${n.date}`));
       if (newNotes.length > 0) {
         setJSON(KEYS.palateNotes, [...local, ...newNotes]);
+        updated = true;
+      }
+    }
+
+    // Merge hunt list - deduplicate by wine name
+    if (cloud.huntList?.length) {
+      const local = getHuntList();
+      const existingWines = new Set(local.map(e => e.wine.toLowerCase()));
+      const newEntries = cloud.huntList.filter(e => !existingWines.has(e.wine.toLowerCase()));
+      if (newEntries.length > 0) {
+        setJSON(KEYS.huntList, [...local, ...newEntries]);
         updated = true;
       }
     }
@@ -457,6 +471,43 @@ export function deletePalateNote(index) {
   }
 }
 
+// --- Hunt List ---
+export function getHuntList() {
+  return getJSON(KEYS.huntList) || [];
+}
+
+export function addHuntListEntry(entry) {
+  const list = getHuntList();
+  const existing = list.findIndex(e => e.wine.toLowerCase() === entry.wine.toLowerCase());
+  const item = {
+    ...entry,
+    addedDate: entry.addedDate || new Date().toISOString(),
+    source: entry.source || "chat",
+    id: entry.id || Date.now().toString(),
+  };
+  if (existing >= 0) list[existing] = { ...list[existing], ...item };
+  else list.push(item);
+  setJSON(KEYS.huntList, list);
+  scheduleCloudSync();
+  return item;
+}
+
+export function removeHuntListEntry(wine) {
+  const list = getHuntList().filter(e => e.wine.toLowerCase() !== wine.toLowerCase());
+  setJSON(KEYS.huntList, list);
+  scheduleCloudSync();
+}
+
+export function updateHuntListEntry(id, updates) {
+  const list = getHuntList();
+  const idx = list.findIndex(e => e.id === id);
+  if (idx >= 0) {
+    list[idx] = { ...list[idx], ...updates, updatedAt: new Date().toISOString() };
+    setJSON(KEYS.huntList, list);
+    scheduleCloudSync();
+  }
+}
+
 // --- Rewrite Section (full replacement) ---
 export function rewriteSection(section, data) {
   const keyMap = {
@@ -465,6 +516,7 @@ export function rewriteSection(section, data) {
     labels: KEYS.labels,
     cellar: KEYS.cellar,
     palateNotes: KEYS.palateNotes,
+    huntList: KEYS.huntList,
   };
   const key = keyMap[section];
   if (!key) return { success: false, message: `Unknown section: ${section}` };
@@ -503,6 +555,7 @@ export function exportAllData() {
     labels: getLabels(),
     cellar: getCellar(),
     palateNotes: getPalateNotes(),
+    huntList: getHuntList(),
     chatHistory: getMessages(),
     exportedAt: new Date().toISOString(),
   };

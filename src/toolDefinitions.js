@@ -2,8 +2,9 @@ import {
   upsertGrape, upsertRegion, upsertLabelTip, addCellarEntry, addPalateNote,
   getGrapes, getRegions, getLabels, getCellar, getPalateNotes,
   deleteGrape, deleteRegion, deleteLabelTip, deleteCellarEntry, deletePalateNote,
+  getHuntList, addHuntListEntry, removeHuntListEntry,
+  rewriteSection,
 } from "./storage";
-import { rewriteSection } from "./storage";
 
 export const TOOL_DEFINITIONS = [
   {
@@ -14,7 +15,7 @@ export const TOOL_DEFINITIONS = [
       properties: {
         section: {
           type: "string",
-          enum: ["grapes", "regions", "labels", "cellar", "palateNotes"],
+          enum: ["grapes", "regions", "labels", "cellar", "palateNotes", "huntList"],
           description: "Which section to read",
         },
       },
@@ -119,7 +120,7 @@ export const TOOL_DEFINITIONS = [
     input_schema: {
       type: "object",
       properties: {
-        section: { type: "string", enum: ["grapes", "regions", "labels", "cellar", "palateNotes"], description: "Which section to delete from" },
+        section: { type: "string", enum: ["grapes", "regions", "labels", "cellar", "palateNotes", "huntList"], description: "Which section to delete from" },
         identifier: { type: "string", description: "Name/flag text of entry to delete (case-insensitive match)" },
         label_type: { type: "string", enum: ["green", "red"], description: "Required when section is 'labels' to identify which list" },
       },
@@ -132,7 +133,7 @@ export const TOOL_DEFINITIONS = [
     input_schema: {
       type: "object",
       properties: {
-        section: { type: "string", enum: ["grapes", "regions", "labels", "cellar", "palateNotes"], description: "Which section to rewrite" },
+        section: { type: "string", enum: ["grapes", "regions", "labels", "cellar", "palateNotes", "huntList"], description: "Which section to rewrite" },
         data: {
           type: "array",
           description: "The complete replacement data as an array of entries. For labels, use an array of objects with a 'category' field ('green' or 'red') — the handler will restructure into {green:[], red:[]}.",
@@ -140,6 +141,32 @@ export const TOOL_DEFINITIONS = [
         },
       },
       required: ["section", "data"],
+    },
+  },
+  {
+    name: "add_to_hunt_list",
+    description: "Add a wine to the user's Hunt List — wines to look for on the next shopping trip. Use when recommending a wine the user hasn't tried yet.",
+    input_schema: {
+      type: "object",
+      properties: {
+        wine: { type: "string", description: "Full wine name (producer, appellation, vintage if specific)" },
+        why: { type: "string", description: "Why this wine is recommended for the user's palate — what to expect, why it fits" },
+        priceRange: { type: "string", description: "Expected price range (e.g., '$25-30')" },
+        priority: { type: "string", enum: ["must-buy", "try-if-you-see-it", "worth-exploring"], description: "How urgently the user should seek this out" },
+        producerUrl: { type: "string", description: "Producer's website URL if known (optional)" },
+      },
+      required: ["wine", "why"],
+    },
+  },
+  {
+    name: "remove_from_hunt_list",
+    description: "Remove a wine from the Hunt List — typically when the user has found and tried it (it moves to Cellar instead)",
+    input_schema: {
+      type: "object",
+      properties: {
+        wine: { type: "string", description: "Name of wine to remove (case-insensitive match)" },
+      },
+      required: ["wine"],
     },
   },
 ];
@@ -152,6 +179,7 @@ function readSection(section) {
     case "labels": return getLabels();
     case "cellar": return getCellar();
     case "palateNotes": return getPalateNotes();
+    case "huntList": return getHuntList();
     default: return null;
   }
 }
@@ -181,6 +209,9 @@ function deleteEntry(section, identifier, labelType) {
       }
       return { success: false, message: `Palate note not found matching "${identifier}"` };
     }
+    case "huntList":
+      removeHuntListEntry(identifier);
+      return { success: true, message: `Removed "${identifier}" from Hunt List` };
     default:
       return { success: false, message: `Unknown section: ${section}` };
   }
@@ -263,6 +294,14 @@ export function executeToolCall(toolName, toolInput) {
     case "rewrite_section": {
       const result = rewriteSection(toolInput.section, toolInput.data);
       return result;
+    }
+    case "add_to_hunt_list": {
+      const entry = addHuntListEntry(toolInput);
+      return { success: true, message: `Added "${toolInput.wine}" to Hunt List (${toolInput.priority || "no priority"})` };
+    }
+    case "remove_from_hunt_list": {
+      removeHuntListEntry(toolInput.wine);
+      return { success: true, message: `Removed "${toolInput.wine}" from Hunt List` };
     }
     default:
       return { success: false, message: `Unknown tool: ${toolName}` };

@@ -8,6 +8,7 @@ import {
   getLabels, upsertLabelTip, deleteLabelTip,
   getCellar, addCellarEntry, updateCellarEntry, deleteCellarEntry,
   getPalateNotes, deletePalateNote,
+  getHuntList, removeHuntListEntry,
   exportAllData, pullFromCloud, migrateToV2,
 } from "./storage";
 
@@ -38,10 +39,19 @@ const btnSmall = {
 const formRow = { marginBottom: 8 };
 const formLabel = { fontSize: 11, fontWeight: 600, color: C.textDim, marginBottom: 3, display: "block" };
 
+function getWineLinks(wineName) {
+  const encoded = encodeURIComponent(wineName);
+  return {
+    wineSearcher: `https://www.wine-searcher.com/find/${encoded}`,
+    vivino: `https://www.vivino.com/search/wines?q=${encoded}`,
+  };
+}
+
 function App() {
   const [tab, setTab] = useState("chat");
   const [expandedRegion, setExpandedRegion] = useState(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [cellarView, setCellarView] = useState("cellar"); // "cellar" or "huntList"
   const [cellarSort, setCellarSort] = useState("date");
   const [verdictFilter, setVerdictFilter] = useState(null);
   const [expandedCellarId, setExpandedCellarId] = useState(null);
@@ -117,6 +127,46 @@ function App() {
 
   const gradeOrder = { "A+": 13, "A": 12, "A-": 11, "B+": 10, "B": 9, "B-": 8, "C+": 7, "C": 6, "C-": 5, "D+": 4, "D": 3, "D-": 2, "F": 1 };
   const gradeOptions = ["A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D+", "D", "D-", "F"];
+
+  const priorityColor = (p) => {
+    switch (p) {
+      case "must-buy": return C.red;
+      case "try-if-you-see-it": return C.gold;
+      case "worth-exploring": return C.green;
+      default: return C.textDim;
+    }
+  };
+  const priorityLabel = (p) => {
+    switch (p) {
+      case "must-buy": return "Must Buy";
+      case "try-if-you-see-it": return "Try If You See It";
+      case "worth-exploring": return "Worth Exploring";
+      default: return p || "No Priority";
+    }
+  };
+  const priorityOrder = { "must-buy": 0, "try-if-you-see-it": 1, "worth-exploring": 2 };
+
+  const WineLinks = ({ wineName, producerUrl }) => {
+    const links = getWineLinks(wineName);
+    return (
+      <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+        <a href={links.wineSearcher} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+          style={{ fontSize: 11, padding: "3px 8px", borderRadius: 4, background: C.bg, border: `1px solid ${C.border}`, color: C.textDim, textDecoration: "none", fontWeight: 500 }}>
+          {"\uD83D\uDD0D"} Wine-Searcher
+        </a>
+        <a href={links.vivino} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+          style={{ fontSize: 11, padding: "3px 8px", borderRadius: 4, background: C.bg, border: `1px solid ${C.border}`, color: C.textDim, textDecoration: "none", fontWeight: 500 }}>
+          {"\uD83C\uDF77"} Vivino
+        </a>
+        {producerUrl && (
+          <a href={producerUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+            style={{ fontSize: 11, padding: "3px 8px", borderRadius: 4, background: C.bg, border: `1px solid ${C.border}`, color: C.textDim, textDecoration: "none", fontWeight: 500 }}>
+            {"\uD83C\uDF10"} Producer
+          </a>
+        )}
+      </div>
+    );
+  };
 
   const handleExport = () => {
     const data = exportAllData();
@@ -641,6 +691,7 @@ function App() {
         {/* ===== CELLAR TAB ===== */}
         {tab === "cellar" && (() => {
           const cellar = getCellar();
+          const huntList = getHuntList();
           const palateNotes = getPalateNotes();
           const isAdding = adding?.tab === "cellar";
 
@@ -651,116 +702,203 @@ function App() {
               : (b.date || "").localeCompare(a.date || "")
           );
 
+          const sortedHunt = [...huntList].sort((a, b) => {
+            const pa = priorityOrder[a.priority] ?? 3;
+            const pb = priorityOrder[b.priority] ?? 3;
+            if (pa !== pb) return pa - pb;
+            return (b.addedDate || "").localeCompare(a.addedDate || "");
+          });
+
+          const segBtn = (view, label) => ({
+            padding: "8px 0", fontSize: 13, fontWeight: 600, flex: 1, textAlign: "center",
+            background: cellarView === view ? C.accent : C.card, color: cellarView === view ? "#fff" : C.textDim,
+            border: `1px solid ${cellarView === view ? C.accent : C.border}`, cursor: "pointer",
+            borderRadius: view === "cellar" ? "8px 0 0 8px" : "0 8px 8px 0",
+          });
+
           return (
             <div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 12 }}>
+              {/* Segmented toggle: Cellar | Hunt List */}
+              <div style={{ display: "flex", marginBottom: 14 }}>
+                <button onClick={() => { setCellarView("cellar"); cancelEdit(); }} style={segBtn("cellar", "Cellar")}>
+                  {"\uD83C\uDF77"} Cellar {cellar.length > 0 ? `(${cellar.length})` : ""}
+                </button>
+                <button onClick={() => { setCellarView("huntList"); cancelEdit(); }} style={segBtn("huntList", "Hunt List")}>
+                  {"\uD83C\uDFAF"} Hunt List {huntList.length > 0 ? `(${huntList.length})` : ""}
+                </button>
+              </div>
+
+              {/* ---- CELLAR VIEW ---- */}
+              {cellarView === "cellar" && (
                 <div>
-                  <div style={{ fontSize: 11, letterSpacing: 3, color: C.goldDim, textTransform: "uppercase" }}>Tasting Log</div>
-                  <div style={{ fontSize: 20, fontWeight: 500, color: C.text, marginTop: 2 }}>My Cellar</div>
-                </div>
-                <div style={{ fontSize: 12, color: C.textDim }}>{sorted.length} wines</div>
-              </div>
-
-              {/* Sort + Export */}
-              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-                <button onClick={() => setCellarSort("date")} style={{ padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600, background: cellarSort === "date" ? C.accent : C.card, color: cellarSort === "date" ? "#fff" : C.textDim, border: `1px solid ${cellarSort === "date" ? C.accent : C.border}`, cursor: "pointer" }}>Newest</button>
-                <button onClick={() => setCellarSort("rating")} style={{ padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600, background: cellarSort === "rating" ? C.accent : C.card, color: cellarSort === "rating" ? "#fff" : C.textDim, border: `1px solid ${cellarSort === "rating" ? C.accent : C.border}`, cursor: "pointer" }}>Top Rated</button>
-                <button onClick={handleExport} style={{ marginLeft: "auto", padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 500, background: C.card, color: C.gold, border: `1px solid ${C.border}`, cursor: "pointer" }}>Export</button>
-              </div>
-
-              {/* Verdict filter pills */}
-              <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
-                {[null, "loved", "liked", "neutral", "disliked", "experiment"].map(v => (
-                  <button key={v || "all"} onClick={() => setVerdictFilter(v)}
-                    style={{
-                      padding: "4px 10px", borderRadius: 16, fontSize: 11, fontWeight: 600,
-                      background: verdictFilter === v ? (v ? verdictColor(v) : C.accent) : C.card,
-                      color: verdictFilter === v ? "#fff" : C.textDim,
-                      border: `1px solid ${verdictFilter === v ? "transparent" : C.border}`,
-                      cursor: "pointer", textTransform: "capitalize",
-                    }}>
-                    {v || "All"}
-                  </button>
-                ))}
-              </div>
-
-              {/* Add Tasting */}
-              {isAdding ? (
-                <CellarForm onCancel={cancelEdit} onSave={(data) => { addCellarEntry({ ...data, source: "manual" }); setAdding(null); bump(); }} />
-              ) : (
-                addButton("Add Tasting", () => { cancelEdit(); setAdding({ tab: "cellar" }); })
-              )}
-
-              {/* Tasting entries */}
-              {sorted.length === 0 ? (
-                <div style={{ padding: 24, textAlign: "center", color: C.textDim, fontSize: 14 }}>
-                  {verdictFilter ? `No "${verdictFilter}" wines yet.` : "No tastings logged yet. Chat with the sommelier about wines you've tried and they'll appear here automatically."}
-                </div>
-              ) : sorted.map((t) => {
-                const entryId = t.id || t.wine;
-                const isExpanded = expandedCellarId === entryId;
-                const editKey = `cellar:${entryId}`;
-                const isEditing = editing?.tab === "cellar" && editing?.id === entryId;
-
-                if (isEditing) {
-                  return <CellarForm key={entryId} initial={editing.data} onCancel={cancelEdit} onSave={(data) => { updateCellarEntry(entryId, data); cancelEdit(); bump(); }} />;
-                }
-
-                return (
-                  <div key={entryId} onClick={() => setExpandedCellarId(isExpanded ? null : entryId)}
-                    style={{ padding: "14px 16px", marginBottom: 8, background: C.card, borderRadius: 10, border: `1px solid ${C.border}`, borderLeft: `3px solid ${verdictColor(t.verdict)}`, cursor: "pointer" }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                      <div style={{ fontSize: 15, fontWeight: 600, color: C.text, flex: 1 }}>{t.wine}</div>
-                      <div style={{ display: "flex", gap: 8, alignItems: "center", marginLeft: 8, flexShrink: 0 }}>
-                        {t.rating && <div style={{ fontSize: 16, fontWeight: 700, color: C.gold }}>{t.rating}</div>}
-                        <div style={{
-                          fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 10,
-                          background: verdictColor(t.verdict), color: "#fff", textTransform: "uppercase", whiteSpace: "nowrap",
-                        }}>{t.verdict}</div>
-                      </div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 12 }}>
+                    <div>
+                      <div style={{ fontSize: 11, letterSpacing: 3, color: C.goldDim, textTransform: "uppercase" }}>Tasting Log</div>
+                      <div style={{ fontSize: 20, fontWeight: 500, color: C.text, marginTop: 2 }}>My Cellar</div>
                     </div>
-                    <div style={{ fontSize: 11, color: C.textFaint, marginTop: 4 }}>{t.date}</div>
+                    <div style={{ fontSize: 12, color: C.textDim }}>{sorted.length} wines</div>
+                  </div>
 
-                    {isExpanded && (
-                      <div style={{ marginTop: 8, borderTop: `1px solid ${C.border}`, paddingTop: 8 }} onClick={e => e.stopPropagation()}>
-                        {t.notes && <div style={{ fontSize: 12.5, color: C.textDim, lineHeight: 1.5, fontStyle: "italic", marginBottom: 8 }}>{t.notes}</div>}
-                        <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                          <button onClick={() => { cancelEdit(); setEditing({ tab: "cellar", id: entryId, data: t }); }} style={btnSmall}>{"\u270F\uFE0F"} Edit</button>
-                          {isConfirming(editKey) ? (
-                            <>
-                              <button onClick={() => setConfirmDelete(null)} style={btnCancel}>Cancel</button>
-                              <button onClick={() => { deleteCellarEntry(entryId); setConfirmDelete(null); setExpandedCellarId(null); bump(); }} style={btnDanger}>Delete</button>
-                            </>
+                  {/* Sort + Export */}
+                  <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                    <button onClick={() => setCellarSort("date")} style={{ padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600, background: cellarSort === "date" ? C.accent : C.card, color: cellarSort === "date" ? "#fff" : C.textDim, border: `1px solid ${cellarSort === "date" ? C.accent : C.border}`, cursor: "pointer" }}>Newest</button>
+                    <button onClick={() => setCellarSort("rating")} style={{ padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600, background: cellarSort === "rating" ? C.accent : C.card, color: cellarSort === "rating" ? "#fff" : C.textDim, border: `1px solid ${cellarSort === "rating" ? C.accent : C.border}`, cursor: "pointer" }}>Top Rated</button>
+                    <button onClick={handleExport} style={{ marginLeft: "auto", padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 500, background: C.card, color: C.gold, border: `1px solid ${C.border}`, cursor: "pointer" }}>Export</button>
+                  </div>
+
+                  {/* Verdict filter pills */}
+                  <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
+                    {[null, "loved", "liked", "neutral", "disliked", "experiment"].map(v => (
+                      <button key={v || "all"} onClick={() => setVerdictFilter(v)}
+                        style={{
+                          padding: "4px 10px", borderRadius: 16, fontSize: 11, fontWeight: 600,
+                          background: verdictFilter === v ? (v ? verdictColor(v) : C.accent) : C.card,
+                          color: verdictFilter === v ? "#fff" : C.textDim,
+                          border: `1px solid ${verdictFilter === v ? "transparent" : C.border}`,
+                          cursor: "pointer", textTransform: "capitalize",
+                        }}>
+                        {v || "All"}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Add Tasting */}
+                  {isAdding ? (
+                    <CellarForm onCancel={cancelEdit} onSave={(data) => { addCellarEntry({ ...data, source: "manual" }); setAdding(null); bump(); }} />
+                  ) : (
+                    addButton("Add Tasting", () => { cancelEdit(); setAdding({ tab: "cellar" }); })
+                  )}
+
+                  {/* Tasting entries */}
+                  {sorted.length === 0 ? (
+                    <div style={{ padding: 24, textAlign: "center", color: C.textDim, fontSize: 14 }}>
+                      {verdictFilter ? `No "${verdictFilter}" wines yet.` : "No tastings logged yet. Chat with the sommelier about wines you've tried and they'll appear here automatically."}
+                    </div>
+                  ) : sorted.map((t) => {
+                    const entryId = t.id || t.wine;
+                    const isExpanded = expandedCellarId === entryId;
+                    const editKey = `cellar:${entryId}`;
+                    const isEditing = editing?.tab === "cellar" && editing?.id === entryId;
+
+                    if (isEditing) {
+                      return <CellarForm key={entryId} initial={editing.data} onCancel={cancelEdit} onSave={(data) => { updateCellarEntry(entryId, data); cancelEdit(); bump(); }} />;
+                    }
+
+                    return (
+                      <div key={entryId} onClick={() => setExpandedCellarId(isExpanded ? null : entryId)}
+                        style={{ padding: "14px 16px", marginBottom: 8, background: C.card, borderRadius: 10, border: `1px solid ${C.border}`, borderLeft: `3px solid ${verdictColor(t.verdict)}`, cursor: "pointer" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                          <div style={{ fontSize: 15, fontWeight: 600, color: C.text, flex: 1 }}>{t.wine}</div>
+                          <div style={{ display: "flex", gap: 8, alignItems: "center", marginLeft: 8, flexShrink: 0 }}>
+                            {t.rating && <div style={{ fontSize: 16, fontWeight: 700, color: C.gold }}>{t.rating}</div>}
+                            <div style={{
+                              fontSize: 10, fontWeight: 600, padding: "2px 8px", borderRadius: 10,
+                              background: verdictColor(t.verdict), color: "#fff", textTransform: "uppercase", whiteSpace: "nowrap",
+                            }}>{t.verdict}</div>
+                          </div>
+                        </div>
+                        <div style={{ fontSize: 11, color: C.textFaint, marginTop: 4 }}>{t.date}</div>
+
+                        {isExpanded && (
+                          <div style={{ marginTop: 8, borderTop: `1px solid ${C.border}`, paddingTop: 8 }} onClick={e => e.stopPropagation()}>
+                            {t.notes && <div style={{ fontSize: 12.5, color: C.textDim, lineHeight: 1.5, fontStyle: "italic", marginBottom: 8 }}>{t.notes}</div>}
+                            <WineLinks wineName={t.wine} producerUrl={t.producerUrl} />
+                            <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", marginTop: 6 }}>
+                              <button onClick={() => { cancelEdit(); setEditing({ tab: "cellar", id: entryId, data: t }); }} style={btnSmall}>{"\u270F\uFE0F"} Edit</button>
+                              {isConfirming(editKey) ? (
+                                <>
+                                  <button onClick={() => setConfirmDelete(null)} style={btnCancel}>Cancel</button>
+                                  <button onClick={() => { deleteCellarEntry(entryId); setConfirmDelete(null); setExpandedCellarId(null); bump(); }} style={btnDanger}>Delete</button>
+                                </>
+                              ) : (
+                                <button onClick={() => setConfirmDelete(editKey)} style={{ ...btnSmall, color: C.red }}>{"\u2715"} Delete</button>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+
+                  {/* Palate Notes */}
+                  {palateNotes.length > 0 && (
+                    <div style={{ marginTop: 24 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: C.gold, marginBottom: 10, letterSpacing: 1, textTransform: "uppercase" }}>Palate Evolution</div>
+                      {palateNotes.map((n, i) => (
+                        <div key={i} style={{ padding: "10px 12px", marginBottom: 5, background: C.accentGlow, borderRadius: 8, borderLeft: `3px solid ${C.gold}`, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>{n.text}</div>
+                            <div style={{ fontSize: 10, color: C.textFaint, marginTop: 4 }}>{n.date}</div>
+                          </div>
+                          {confirmDelete === `palate:${i}` ? (
+                            <div style={{ display: "flex", gap: 4 }}>
+                              <button onClick={() => setConfirmDelete(null)} style={{ ...btnSmall, fontSize: 10 }}>No</button>
+                              <button onClick={() => { deletePalateNote(i); setConfirmDelete(null); bump(); }} style={{ ...btnDanger, fontSize: 10 }}>Yes</button>
+                            </div>
                           ) : (
-                            <button onClick={() => setConfirmDelete(editKey)} style={{ ...btnSmall, color: C.red }}>{"\u2715"} Delete</button>
+                            <button onClick={() => setConfirmDelete(`palate:${i}`)} style={{ ...btnSmall, color: C.red, flexShrink: 0 }}>{"\u2715"}</button>
                           )}
                         </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-
-              {/* Palate Notes */}
-              {palateNotes.length > 0 && (
-                <div style={{ marginTop: 24 }}>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: C.gold, marginBottom: 10, letterSpacing: 1, textTransform: "uppercase" }}>Palate Evolution</div>
-                  {palateNotes.map((n, i) => (
-                    <div key={i} style={{ padding: "10px 12px", marginBottom: 5, background: C.accentGlow, borderRadius: 8, borderLeft: `3px solid ${C.gold}`, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>{n.text}</div>
-                        <div style={{ fontSize: 10, color: C.textFaint, marginTop: 4 }}>{n.date}</div>
-                      </div>
-                      {confirmDelete === `palate:${i}` ? (
-                        <div style={{ display: "flex", gap: 4 }}>
-                          <button onClick={() => setConfirmDelete(null)} style={{ ...btnSmall, fontSize: 10 }}>No</button>
-                          <button onClick={() => { deletePalateNote(i); setConfirmDelete(null); bump(); }} style={{ ...btnDanger, fontSize: 10 }}>Yes</button>
-                        </div>
-                      ) : (
-                        <button onClick={() => setConfirmDelete(`palate:${i}`)} style={{ ...btnSmall, color: C.red, flexShrink: 0 }}>{"\u2715"}</button>
-                      )}
+                      ))}
                     </div>
-                  ))}
+                  )}
+                </div>
+              )}
+
+              {/* ---- HUNT LIST VIEW ---- */}
+              {cellarView === "huntList" && (
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 12 }}>
+                    <div>
+                      <div style={{ fontSize: 11, letterSpacing: 3, color: C.goldDim, textTransform: "uppercase" }}>Shopping List</div>
+                      <div style={{ fontSize: 20, fontWeight: 500, color: C.text, marginTop: 2 }}>Hunt List</div>
+                    </div>
+                    <div style={{ fontSize: 12, color: C.textDim }}>{huntList.length} wines</div>
+                  </div>
+
+                  {sortedHunt.length === 0 ? (
+                    <div style={{ padding: 24, textAlign: "center", color: C.textDim, fontSize: 14 }}>
+                      No wines on your hunt list yet. Ask the sommelier for recommendations and they'll add them here.
+                    </div>
+                  ) : sortedHunt.map((h) => {
+                    const hId = h.id || h.wine;
+                    const isExpanded = expandedCellarId === `hunt:${hId}`;
+                    const deleteKey = `hunt:${hId}`;
+
+                    return (
+                      <div key={hId} onClick={() => setExpandedCellarId(isExpanded ? null : `hunt:${hId}`)}
+                        style={{ padding: "14px 16px", marginBottom: 8, background: C.card, borderRadius: 10, border: `1px solid ${C.border}`, borderLeft: `3px solid ${priorityColor(h.priority)}`, cursor: "pointer" }}>
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                          <div style={{ fontSize: 15, fontWeight: 600, color: C.text, flex: 1 }}>{h.wine}</div>
+                          <div style={{ display: "flex", gap: 8, alignItems: "center", marginLeft: 8, flexShrink: 0 }}>
+                            {h.priceRange && <span style={{ fontSize: 12, color: C.gold, fontWeight: 500 }}>{h.priceRange}</span>}
+                            <div style={{
+                              fontSize: 9, fontWeight: 600, padding: "2px 8px", borderRadius: 10,
+                              background: priorityColor(h.priority), color: "#fff", textTransform: "uppercase", whiteSpace: "nowrap",
+                            }}>{priorityLabel(h.priority)}</div>
+                          </div>
+                        </div>
+                        <div style={{ fontSize: 12.5, color: C.textDim, marginTop: 4, lineHeight: 1.5 }}>{h.why}</div>
+
+                        {isExpanded && (
+                          <div style={{ marginTop: 8, borderTop: `1px solid ${C.border}`, paddingTop: 8 }} onClick={e => e.stopPropagation()}>
+                            {h.addedDate && <div style={{ fontSize: 11, color: C.textFaint, marginBottom: 6 }}>Added {new Date(h.addedDate).toLocaleDateString()}</div>}
+                            <WineLinks wineName={h.wine} producerUrl={h.producerUrl} />
+                            <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", marginTop: 6 }}>
+                              {isConfirming(deleteKey) ? (
+                                <>
+                                  <button onClick={() => setConfirmDelete(null)} style={btnCancel}>Cancel</button>
+                                  <button onClick={() => { removeHuntListEntry(h.wine); setConfirmDelete(null); setExpandedCellarId(null); bump(); }} style={btnDanger}>Remove</button>
+                                </>
+                              ) : (
+                                <button onClick={() => setConfirmDelete(deleteKey)} style={{ ...btnSmall, color: C.red }}>{"\u2715"} Remove</button>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>

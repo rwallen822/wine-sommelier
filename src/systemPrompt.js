@@ -1,5 +1,5 @@
 import { PALATE_CORE } from './palateConfig';
-import { getCellar, getPalateNotes, getGrapes, getRegions } from './storage';
+import { getCellar, getPalateNotes, getGrapes, getRegions, getHuntList } from './storage';
 
 export function buildSystemPrompt() {
   const cellar = getCellar();
@@ -21,6 +21,12 @@ export function buildSystemPrompt() {
   // Build tasting history context
   const lovedWines = cellar.filter(w => w.verdict === "loved").map(w => w.wine).join(", ");
   const recentWines = cellar.slice(-8).map(w => `${w.wine} (${w.rating || w.verdict})`).join(", ");
+
+  // Build hunt list context
+  const huntList = getHuntList();
+  const huntListText = huntList.length > 0
+    ? `\n\nHUNT LIST (wines to find):\n${huntList.map(h => `- ${h.wine}${h.priority ? ` [${h.priority}]` : ""}: ${h.why}${h.priceRange ? ` (${h.priceRange})` : ""}`).join("\n")}`
+    : "";
 
   const cellarText = cellar.length > 0
     ? `\n\nWINES TRIED:\n${cellar.map(t => `- ${t.wine}${t.rating ? ` (${t.rating})` : ""}: ${t.notes || "no notes"} [${t.verdict}] (${t.date})`).join("\n")}`
@@ -48,7 +54,7 @@ GOLDMINE REGIONS UNDER $30: ${goldmineRegions || "none yet"}
 SPLURGE REGIONS: ${splurgeRegions || "none yet"}
 
 WINES HE'S LOVED: ${lovedWines || "none yet"}
-RECENT BOTTLES: ${recentWines || "none yet"}${cellarText}${palateText}
+RECENT BOTTLES: ${recentWines || "none yet"}${cellarText}${huntListText}${palateText}
 
 YOUR ROLE IN THIS CHAT:
 - Rich will send you photos of bottles he's considering buying, bottles he's drinking, or just chat about wine.
@@ -93,5 +99,17 @@ If you notice a section getting messy (duplicates, overlapping entries), suggest
 - "I see some duplicate label tips. Want me to clean up that section?"
 
 - After a deep conversation about a new topic, proactively offer to create entries in the relevant sections.
-- Use letter grades (A+ through F) for all ratings.`;
+- Use letter grades (A+ through F) for all ratings.
+
+HUNT LIST:
+You can add wines to Rich's Hunt List when you recommend bottles he should look for.
+- Use add_to_hunt_list when recommending a wine he hasn't tried
+- Set priority: "must-buy" for wines perfectly matched to his palate, "try-if-you-see-it" for good fits, "worth-exploring" for interesting experiments
+- Include producerUrl when you know it
+- When Rich tells you he's tried a wine from the Hunt List, log it to the Cellar and remove it from the Hunt List
+- Proactively offer to add recommendations: "Want me to add that to your hunt list?"
+
+EXTERNAL LINKS:
+Wine names in the Cellar and Hunt List link to Wine-Searcher and Vivino for lookup.
+When logging tastings or adding to the hunt list, include producerUrl when you know the producer's website.`;
 }

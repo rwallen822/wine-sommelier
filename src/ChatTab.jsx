@@ -15,6 +15,7 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
   const [input, setInput] = useState("");
   const [pendingImage, setPendingImage] = useState(null);
   const [pendingImageData, setPendingImageData] = useState(null);
+  const [pendingMediaType, setPendingMediaType] = useState("image/jpeg");
   const [loading, setLoading] = useState(false);
   const [streamingText, setStreamingText] = useState("");
   const [mode, setMode] = useState("deep");
@@ -275,8 +276,10 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
     setMessages(newMessages);
     setInput("");
     const imgData = pendingImageData;
+    const mediaType = pendingMediaType;
     setPendingImage(null);
     setPendingImageData(null);
+    setPendingMediaType("image/jpeg");
     setLoading(true);
     setStreamingText("");
 
@@ -290,7 +293,7 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
               return {
                 role: "user",
                 content: [
-                  { type: "image", source: { type: "base64", media_type: "image/jpeg", data: imgData } },
+                  { type: "image", source: { type: "base64", media_type: mediaType, data: imgData } },
                   { type: "text", text: text || "What do you think of this bottle? Give me your honest assessment." },
                 ],
               };
@@ -449,6 +452,9 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
   const handleImage = useCallback((e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const mediaType = file.type || "image/jpeg";
+    console.log("[chat] Image selected:", { name: file.name, type: file.type, size: file.size, mediaType });
+    setPendingMediaType(mediaType);
     const reader = new FileReader();
     reader.onload = (ev) => {
       setPendingImage(ev.target.result);
@@ -466,7 +472,7 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
   };
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 70px)", position: "relative" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "calc(100dvh - 70px)", position: "relative" }}>
       <div style={{ flex: 1, overflowY: "auto", padding: "8px 0", WebkitOverflowScrolling: "touch" }}>
         {messages.map((m, i) => (
           <div key={i} style={{ padding: m.role === "system" ? "2px 0" : "4px 0" }}>
@@ -558,67 +564,70 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
         <div ref={chatEndRef} />
       </div>
 
-      {pendingImage && (
-        <div style={{ padding: "8px 4px", display: "flex", alignItems: "center", gap: 8 }}>
-          <div style={{ position: "relative" }}>
-            <img src={pendingImage} alt="" style={{ height: 52, width: 52, objectFit: "cover", borderRadius: 8, border: `1px solid ${C.border}` }} />
-            <button
-              onClick={() => { setPendingImage(null); setPendingImageData(null); }}
-              style={{ position: "absolute", top: -6, right: -6, width: 18, height: 18, borderRadius: "50%", background: C.red, border: "none", color: "#fff", fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}
-            >x</button>
+      {/* Bottom controls — pinned, never scroll */}
+      <div style={{ flexShrink: 0, paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+        {pendingImage && (
+          <div style={{ padding: "8px 4px", display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={{ position: "relative" }}>
+              <img src={pendingImage} alt="" style={{ height: 52, width: 52, objectFit: "cover", borderRadius: 8, border: `1px solid ${C.border}` }} />
+              <button
+                onClick={() => { setPendingImage(null); setPendingImageData(null); setPendingMediaType("image/jpeg"); }}
+                style={{ position: "absolute", top: -6, right: -6, width: 18, height: 18, borderRadius: "50%", background: C.red, border: "none", color: "#fff", fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}
+              >x</button>
+            </div>
+            <div style={{ fontSize: 12, color: C.textDim, fontStyle: "italic" }}>Photo attached</div>
           </div>
-          <div style={{ fontSize: 12, color: C.textDim, fontStyle: "italic" }}>Photo attached</div>
+        )}
+
+        <div style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 0", borderTop: `1px solid ${C.border}` }}>
+          <button
+            onClick={() => setMode(mode === "quick" ? "deep" : "quick")}
+            style={{
+              padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600,
+              background: mode === "deep" ? C.accent : C.card,
+              color: mode === "deep" ? "#FFFFFF" : C.textDim,
+              border: `1px solid ${mode === "deep" ? C.accent : C.border}`,
+              cursor: "pointer", transition: "all 0.15s",
+            }}
+          >
+            {mode === "deep" ? "Deep" : "Quick"}
+          </button>
+          <span style={{ fontSize: 11, color: C.textFaint }}>
+            {mode === "deep" ? "Opus" : "Sonnet"}
+          </span>
         </div>
-      )}
 
-      <div style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 0", borderTop: `1px solid ${C.border}` }}>
-        <button
-          onClick={() => setMode(mode === "quick" ? "deep" : "quick")}
-          style={{
-            padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600,
-            background: mode === "deep" ? C.accent : C.card,
-            color: mode === "deep" ? "#FFFFFF" : C.textDim,
-            border: `1px solid ${mode === "deep" ? C.accent : C.border}`,
-            cursor: "pointer", transition: "all 0.15s",
-          }}
-        >
-          {mode === "deep" ? "Deep" : "Quick"}
-        </button>
-        <span style={{ fontSize: 11, color: C.textFaint }}>
-          {mode === "deep" ? "Opus" : "Sonnet"}
-        </span>
-      </div>
-
-      <div style={{ display: "flex", gap: 10, alignItems: "flex-end", padding: "8px 0 8px" }}>
-        <button
-          onClick={() => fileRef.current?.click()}
-          style={{ width: 44, height: 44, borderRadius: 22, background: C.card, border: `1px solid ${C.border}`, color: C.accent, fontSize: 20, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}
-        >{"\u{1F4F7}"}</button>
-        <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handleImage} style={{ display: "none" }} />
-        <textarea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="What are we drinking?"
-          rows={1}
-          style={{
-            flex: 1, padding: "12px 16px", borderRadius: 22, border: `1px solid ${C.border}`,
-            background: C.card, color: C.text, fontSize: 15, fontFamily: "inherit",
-            resize: "none", outline: "none", lineHeight: 1.4, maxHeight: 80,
-            boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
-          }}
-        />
-        <button
-          onClick={sendMessage}
-          disabled={loading || (!input.trim() && !pendingImageData)}
-          style={{
-            width: 44, height: 44, borderRadius: 22,
-            background: (input.trim() || pendingImageData) ? C.accent : C.border,
-            border: "none", color: "#FFFFFF", fontSize: 18, cursor: "pointer", flexShrink: 0,
-            opacity: loading ? 0.5 : 1, display: "flex", alignItems: "center", justifyContent: "center",
-            transition: "background 0.15s",
-          }}
-        >{"\u2191"}</button>
+        <div style={{ display: "flex", gap: 10, alignItems: "flex-end", padding: "8px 0 8px" }}>
+          <button
+            onClick={() => fileRef.current?.click()}
+            style={{ width: 44, height: 44, borderRadius: 22, background: C.card, border: `1px solid ${C.border}`, color: C.accent, fontSize: 20, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}
+          >{"\u{1F4F7}"}</button>
+          <input ref={fileRef} type="file" accept="image/*" onChange={handleImage} style={{ display: "none" }} />
+          <textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="What are we drinking?"
+            rows={1}
+            style={{
+              flex: 1, padding: "12px 16px", borderRadius: 22, border: `1px solid ${C.border}`,
+              background: C.card, color: C.text, fontSize: 15, fontFamily: "inherit",
+              resize: "none", outline: "none", lineHeight: 1.4, maxHeight: 80,
+              boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+            }}
+          />
+          <button
+            onClick={sendMessage}
+            disabled={loading || (!input.trim() && !pendingImageData)}
+            style={{
+              width: 44, height: 44, borderRadius: 22,
+              background: (input.trim() || pendingImageData) ? C.accent : C.border,
+              border: "none", color: "#FFFFFF", fontSize: 18, cursor: "pointer", flexShrink: 0,
+              opacity: loading ? 0.5 : 1, display: "flex", alignItems: "center", justifyContent: "center",
+              transition: "background 0.15s",
+            }}
+          >{"\u2191"}</button>
+        </div>
       </div>
 
       <style>{`
