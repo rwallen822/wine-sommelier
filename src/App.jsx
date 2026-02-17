@@ -96,19 +96,19 @@ function App() {
   const tierColor = (t) => {
     switch (t) {
       case "goldmine": return C.green;
-      case "good": return C.green;
-      case "splurge": return C.yellow;
-      case "caution": return C.yellow;
+      case "good": return C.greenLight;
+      case "splurge": return C.iceBlue;
+      case "caution": return C.red;
       case "avoid": return C.red;
       default: return C.textDim;
     }
   };
   const tierLabel = (t) => {
     switch (t) {
-      case "goldmine": return "GOLDMINE";
-      case "good": return "GOOD BET";
-      case "splurge": return "SPLURGE";
-      case "caution": return "CAUTION";
+      case "goldmine": return "\uD83E\uDE99 GOLDMINE";
+      case "good": return "\uD83D\uDC4D GOOD BET";
+      case "splurge": return "\uD83D\uDC8E SPLURGE";
+      case "caution": return "\u26A0\uFE0F CAUTION";
       case "avoid": return "AVOID";
       default: return t?.toUpperCase();
     }

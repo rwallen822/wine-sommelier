@@ -17,11 +17,13 @@ export const C = {
 
   // Status colors
   green: "#2E7D4A",
+  greenLight: "#4CAF50",
   greenBg: "rgba(46, 125, 74, 0.1)",
   red: "#C53030",
   redBg: "rgba(197, 48, 48, 0.08)",
   yellow: "#B7791F",
   yellowBg: "rgba(183, 121, 31, 0.1)",
+  iceBlue: "#4A90D9",
 
   // Chat
   chatUser: "#722F37",
