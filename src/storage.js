@@ -210,6 +210,27 @@ export async function pullFromCloud() {
     console.log("[sync] pulled from cloud:", cloud);
     if (!cloud) return false;
 
+    const localLastSync = getJSON(KEYS.lastSync);
+    const cloudUpdatedAt = cloud.updatedAt;
+
+    // If cloud was pushed by another device after our last sync, replace local data.
+    // This handles deletions and restructuring that additive merging misses.
+    if (cloudUpdatedAt && (!localLastSync || cloudUpdatedAt > localLastSync)) {
+      console.log("[sync] cloud is newer — replacing local data. cloud:", cloudUpdatedAt, "local:", localLastSync);
+      let updated = false;
+      if (cloud.grapes) { setJSON(KEYS.grapes, cloud.grapes); updated = true; }
+      if (cloud.regions) { setJSON(KEYS.regions, cloud.regions); updated = true; }
+      if (cloud.labels) { setJSON(KEYS.labels, cloud.labels); updated = true; }
+      if (cloud.cellar) { setJSON(KEYS.cellar, cloud.cellar); updated = true; }
+      if (cloud.palateNotes) { setJSON(KEYS.palateNotes, cloud.palateNotes); updated = true; }
+      const cloudMessages = cloud.chatHistory || cloud.messages || [];
+      if (cloudMessages.length > 0) { setJSON(KEYS.messages, cloudMessages); updated = true; }
+      setJSON(KEYS.lastSync, new Date().toISOString());
+      return updated;
+    }
+
+    // Local is same or newer — additive merge (safe, won't lose local changes)
+    console.log("[sync] local is current — doing additive merge. cloud:", cloudUpdatedAt, "local:", localLastSync);
     let updated = false;
 
     // Merge grapes
@@ -238,11 +259,11 @@ export async function pullFromCloud() {
       let labelsUpdated = false;
       if (cloud.labels.green?.length) {
         const merged = mergeByField(local.green, cloud.labels.green, "flag");
-        if (merged.length > local.green.length) { local.green = merged; labelsUpdated = true; }
+        if (JSON.stringify(merged) !== JSON.stringify(local.green)) { local.green = merged; labelsUpdated = true; }
       }
       if (cloud.labels.red?.length) {
         const merged = mergeByField(local.red, cloud.labels.red, "flag");
-        if (merged.length > local.red.length) { local.red = merged; labelsUpdated = true; }
+        if (JSON.stringify(merged) !== JSON.stringify(local.red)) { local.red = merged; labelsUpdated = true; }
       }
       if (labelsUpdated) {
         setJSON(KEYS.labels, local);
@@ -283,13 +304,8 @@ export async function pullFromCloud() {
       updated = true;
     }
 
-    // Push local data back up so all devices share
-    const localAfter = {
-      chatHistory: getMessages(),
-      grapes: getGrapes(),
-      cellar: getCellar(),
-    };
-    if (localAfter.chatHistory.length > 0 || localAfter.grapes.length > 0 || localAfter.cellar.length > 0) {
+    // Push merged data back up so all devices share
+    if (updated) {
       await pushToCloud();
     }
 
