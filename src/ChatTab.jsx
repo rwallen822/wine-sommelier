@@ -18,12 +18,7 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
   const [pendingMediaType, setPendingMediaType] = useState("image/jpeg");
   const [loading, setLoading] = useState(false);
   const [streamingText, setStreamingText] = useState("");
-  const [mode, setMode] = useState("deep");
-
-  const models = {
-    quick: "claude-sonnet-4-20250514",
-    deep: "claude-opus-4-5-20251101"
-  };
+  const MODEL = "claude-sonnet-4-6";
   const chatEndRef = useRef(null);
   const fileRef = useRef(null);
 
@@ -203,7 +198,7 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
   // --- API call helper (now streaming, with 429 retry) ---
   const callAPI = useCallback(async (apiMessages, maxTokens = 4096, onDelta) => {
     const requestBody = {
-      model: models[mode],
+      model: MODEL,
       max_tokens: maxTokens,
       system: buildSystemPrompt(),
       messages: apiMessages,
@@ -265,7 +260,7 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
     });
 
     return message;
-  }, [mode]);
+  }, []);
 
   const sendMessage = useCallback(async () => {
     const text = input.trim();
@@ -447,7 +442,7 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
     }
     setStreamingText("");
     setLoading(false);
-  }, [input, pendingImageData, pendingImage, messages, mode, callAPI, onDataUpdated]);
+  }, [input, pendingImageData, pendingImage, messages, callAPI, onDataUpdated]);
 
   const handleImage = useCallback((e) => {
     const file = e.target.files?.[0];
@@ -579,25 +574,7 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
           </div>
         )}
 
-        <div style={{ display: "flex", gap: 10, alignItems: "center", padding: "10px 0", borderTop: `1px solid ${C.border}` }}>
-          <button
-            onClick={() => setMode(mode === "quick" ? "deep" : "quick")}
-            style={{
-              padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600,
-              background: mode === "deep" ? C.accent : C.card,
-              color: mode === "deep" ? "#FFFFFF" : C.textDim,
-              border: `1px solid ${mode === "deep" ? C.accent : C.border}`,
-              cursor: "pointer", transition: "all 0.15s",
-            }}
-          >
-            {mode === "deep" ? "Deep" : "Quick"}
-          </button>
-          <span style={{ fontSize: 11, color: C.textFaint }}>
-            {mode === "deep" ? "Opus" : "Sonnet"}
-          </span>
-        </div>
-
-        <div style={{ display: "flex", gap: 10, alignItems: "flex-end", padding: "8px 0 8px" }}>
+        <div style={{ display: "flex", gap: 10, alignItems: "flex-end", padding: "8px 0 8px", borderTop: `1px solid ${C.border}` }}>
           <button
             onClick={() => fileRef.current?.click()}
             style={{ width: 44, height: 44, borderRadius: 22, background: C.card, border: `1px solid ${C.border}`, color: C.accent, fontSize: 20, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}
