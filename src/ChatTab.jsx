@@ -281,20 +281,19 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
     try {
       // Build API messages (exclude system tool confirmations)
       const buildApiMessages = (msgs) => {
-        return msgs
-          .filter(m => m.role !== "system")
-          .map((m, i) => {
-            if (m.role === "user" && m.image && i === msgs.length - 1 && imgData) {
-              return {
-                role: "user",
-                content: [
-                  { type: "image", source: { type: "base64", media_type: mediaType, data: imgData } },
-                  { type: "text", text: text || "What do you think of this bottle? Give me your honest assessment." },
-                ],
-              };
-            }
-            return { role: m.role, content: m.text };
-          });
+        const filtered = msgs.filter(m => m.role !== "system");
+        return filtered.map((m, i) => {
+          if (m.role === "user" && m.image && i === filtered.length - 1 && imgData) {
+            return {
+              role: "user",
+              content: [
+                { type: "image", source: { type: "base64", media_type: mediaType, data: imgData } },
+                { type: "text", text: text || "What do you think of this bottle? Give me your honest assessment." },
+              ],
+            };
+          }
+          return { role: m.role, content: m.text };
+        });
       };
 
       let apiMessages = buildApiMessages(newMessages);
