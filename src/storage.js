@@ -140,10 +140,26 @@ export function migrateToV2() {
 }
 
 // --- Labels V2 Migration (hard reset with comprehensive content) ---
+// IMPORTANT: palateConfig.js is a fallback for empty/new installations ONLY.
+// Once the user has ANY data in localStorage (especially source: "chat" entries),
+// never overwrite it. The user's localStorage data is the source of truth.
 export function migrateLabelsV2() {
   if (getJSON(KEYS.labelsOverhauled)) return;
 
-  // Hard reset: wipe everything and seed fresh from LABEL_TIPS
+  // Defensive: if user already has chat-sourced labels, don't wipe them
+  const existing = getJSON(KEYS.labels);
+  if (existing) {
+    const hasUserData = [
+      ...(existing.green || []),
+      ...(existing.red || []),
+    ].some(t => t.source === "chat");
+    if (hasUserData) {
+      setJSON(KEYS.labelsOverhauled, true);
+      return;
+    }
+  }
+
+  // First-time seed from LABEL_TIPS defaults
   const labels = {
     green: LABEL_TIPS.green.map(t => ({ ...t, source: "static" })),
     red: LABEL_TIPS.red.map(t => ({ ...t, source: "static" })),

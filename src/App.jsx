@@ -11,12 +11,17 @@ import {
   getHuntList, removeHuntListEntry,
   exportAllData, pullFromCloud, migrateToV2, migrateLabelsV2,
 } from "./storage";
+import {
+  MessageCircle, Grape, Globe, Tag, Wine,
+  X, Pencil, Plus, Search, ExternalLink, Target, Download,
+} from "lucide-react";
+import { GrapeLeaf, GrapeCluster, VineTendril, WineBottle, WineGlassArt, VineDivider } from "./WineArt";
 
 // --- Shared styles ---
 const inputStyle = {
-  background: C.bg, border: `1px solid ${C.border}`, borderRadius: 6,
-  padding: "8px 10px", fontSize: 13, color: C.text, width: "100%",
-  fontFamily: "'Inter', sans-serif", outline: "none",
+  background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8,
+  padding: "10px 12px", fontSize: 13, color: C.text, width: "100%",
+  fontFamily: "'Nunito Sans', sans-serif", outline: "none",
 };
 const selectStyle = { ...inputStyle, appearance: "auto" };
 const textareaStyle = { ...inputStyle, resize: "vertical", minHeight: 50 };
@@ -35,9 +40,14 @@ const btnDanger = {
 const btnSmall = {
   padding: "3px 8px", borderRadius: 4, fontSize: 11, fontWeight: 500,
   background: "transparent", border: `1px solid ${C.border}`, cursor: "pointer", color: C.textDim,
+  display: "flex", alignItems: "center", justifyContent: "center",
 };
 const formRow = { marginBottom: 8 };
 const formLabel = { fontSize: 11, fontWeight: 600, color: C.textDim, marginBottom: 3, display: "block" };
+const cardBase = {
+  padding: "14px 16px", marginBottom: 8, background: C.card, borderRadius: 12,
+  border: `1px solid ${C.border}`, boxShadow: C.cardShadow,
+};
 
 function getWineLinks(wineName) {
   const encoded = encodeURIComponent(wineName);
@@ -48,10 +58,11 @@ function getWineLinks(wineName) {
 }
 
 function App() {
-  const [tab, setTab] = useState("chat");
+  const validTabs = ["chat", "grapes", "regions", "labels", "cellar"];
+  const urlTab = new URLSearchParams(window.location.search).get("tab");
+  const [tab, setTab] = useState(validTabs.includes(urlTab) ? urlTab : "chat");
   const [expandedRegion, setExpandedRegion] = useState(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
-  const [cellarView, setCellarView] = useState("cellar"); // "cellar" or "huntList"
+  const [cellarView, setCellarView] = useState("cellar");
   const [cellarSort, setCellarSort] = useState("date");
   const [verdictFilter, setVerdictFilter] = useState(null);
   const [expandedCellarId, setExpandedCellarId] = useState(null);
@@ -59,9 +70,9 @@ function App() {
   const [dataVersion, setDataVersion] = useState(0);
 
   // CRUD state
-  const [editing, setEditing] = useState(null);   // { tab, id, data }
-  const [adding, setAdding] = useState(null);      // { tab, category? }
-  const [confirmDelete, setConfirmDelete] = useState(null); // "tab:id"
+  const [editing, setEditing] = useState(null);
+  const [adding, setAdding] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null);
 
   useEffect(() => {
     migrateToV2();
@@ -77,16 +88,16 @@ function App() {
   const cancelEdit = () => { setEditing(null); setAdding(null); setConfirmDelete(null); };
 
   const tabs = [
-    { id: "chat", label: "Chat", icon: "\u{1F4AC}" },
-    { id: "grapes", label: "Grapes", icon: "\u{1F347}" },
-    { id: "regions", label: "Regions", icon: "\u{1F5FA}" },
-    { id: "labels", label: "Labels", icon: "\u{1F3F7}" },
-    { id: "cellar", label: "Cellar", icon: "\u{1F377}" },
+    { id: "chat", label: "Chat", Icon: MessageCircle },
+    { id: "grapes", label: "Grapes", Icon: Grape },
+    { id: "regions", label: "Regions", Icon: Globe },
+    { id: "labels", label: "Labels", Icon: Tag },
+    { id: "cellar", label: "Cellar", Icon: Wine },
   ];
 
   const selectTab = (id) => {
     setTab(id);
-    setDrawerOpen(false);
+    const url = new URL(window.location); url.searchParams.set("tab", id); window.history.replaceState({}, "", url);
     cancelEdit();
     if (id !== "chat") window.scrollTo(0, 0);
   };
@@ -106,10 +117,10 @@ function App() {
   };
   const tierLabel = (t) => {
     switch (t) {
-      case "goldmine": return "\uD83E\uDE99 GOLDMINE";
-      case "good": return "\uD83D\uDC4D GOOD BET";
-      case "splurge": return "\uD83D\uDC8E SPLURGE";
-      case "caution": return "\u26A0\uFE0F CAUTION";
+      case "goldmine": return "SAFE BET";
+      case "good": return "GOOD BET";
+      case "splurge": return "SPLURGE";
+      case "caution": return "CAUTION";
       case "avoid": return "AVOID";
       default: return t?.toUpperCase();
     }
@@ -147,22 +158,25 @@ function App() {
   };
   const priorityOrder = { "must-buy": 0, "try-if-you-see-it": 1, "worth-exploring": 2 };
 
+  const linkStyle = {
+    fontSize: 11, padding: "3px 8px", borderRadius: 4, background: C.bg,
+    border: `1px solid ${C.border}`, color: C.textDim, textDecoration: "none",
+    fontWeight: 500, display: "inline-flex", alignItems: "center", gap: 3,
+  };
+
   const WineLinks = ({ wineName, producerUrl }) => {
     const links = getWineLinks(wineName);
     return (
       <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
-        <a href={links.wineSearcher} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
-          style={{ fontSize: 11, padding: "3px 8px", borderRadius: 4, background: C.bg, border: `1px solid ${C.border}`, color: C.textDim, textDecoration: "none", fontWeight: 500 }}>
-          {"\uD83D\uDD0D"} Wine-Searcher
+        <a href={links.wineSearcher} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={linkStyle}>
+          <Search size={12} strokeWidth={2} /> Wine-Searcher
         </a>
-        <a href={links.vivino} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
-          style={{ fontSize: 11, padding: "3px 8px", borderRadius: 4, background: C.bg, border: `1px solid ${C.border}`, color: C.textDim, textDecoration: "none", fontWeight: 500 }}>
-          {"\uD83C\uDF77"} Vivino
+        <a href={links.vivino} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={linkStyle}>
+          <Wine size={12} strokeWidth={2} /> Vivino
         </a>
         {producerUrl && (
-          <a href={producerUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
-            style={{ fontSize: 11, padding: "3px 8px", borderRadius: 4, background: C.bg, border: `1px solid ${C.border}`, color: C.textDim, textDecoration: "none", fontWeight: 500 }}>
-            {"\uD83C\uDF10"} Producer
+          <a href={producerUrl} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={linkStyle}>
+            <ExternalLink size={12} strokeWidth={2} /> Producer
           </a>
         )}
       </div>
@@ -187,25 +201,26 @@ function App() {
   // --- Edit/Delete action buttons for a card ---
   const cardActions = (deleteKey, onEdit) => (
     <div style={{ display: "flex", gap: 4, marginLeft: 6, flexShrink: 0 }} onClick={e => e.stopPropagation()}>
-      <button onClick={onEdit} style={btnSmall} title="Edit">{"\u270F\uFE0F"}</button>
+      <button onClick={onEdit} style={btnSmall} title="Edit"><Pencil size={14} strokeWidth={1.8} /></button>
       {confirmDelete === deleteKey ? (
         <button onClick={() => { setConfirmDelete(null); }} style={btnDanger}>Confirm?</button>
       ) : (
-        <button onClick={() => setConfirmDelete(deleteKey)} style={{ ...btnSmall, color: C.red }} title="Delete">{"\u2715"}</button>
+        <button onClick={() => setConfirmDelete(deleteKey)} style={{ ...btnSmall, color: C.red }} title="Delete"><X size={14} strokeWidth={1.8} /></button>
       )}
     </div>
   );
 
-  // Confirm delete needs an actual handler — we wire it in each tab
   const isConfirming = (key) => confirmDelete === key;
 
   // --- Add button ---
   const addButton = (label, onClick) => (
     <button onClick={onClick} style={{
-      padding: "8px 16px", borderRadius: 8, fontSize: 13, fontWeight: 600,
+      padding: "10px 16px", borderRadius: 10, fontSize: 13, fontWeight: 600,
       background: C.card, color: C.accent, border: `1px dashed ${C.accent}`,
       cursor: "pointer", width: "100%", marginBottom: 14, textAlign: "center",
-    }}>+ {label}</button>
+      display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+      boxShadow: C.cardShadow,
+    }}><Plus size={16} strokeWidth={2} /> {label}</button>
   );
 
   // --- Grape Form ---
@@ -282,7 +297,7 @@ function App() {
         <div style={{ display: "flex", gap: 8, ...formRow }}>
           <div style={{ flex: 1 }}><label style={formLabel}>Tier</label>
             <select style={selectStyle} value={tier} onChange={e => setTier(e.target.value)}>
-              <option value="goldmine">Goldmine</option><option value="good">Good</option><option value="splurge">Splurge</option><option value="caution">Caution</option><option value="avoid">Avoid</option>
+              <option value="goldmine">Safe Bet</option><option value="good">Good</option><option value="splurge">Splurge</option><option value="caution">Caution</option><option value="avoid">Avoid</option>
             </select>
           </div>
           <div style={{ flex: 1 }}><label style={formLabel}>Price</label><input style={inputStyle} value={price} onChange={e => setPrice(e.target.value)} placeholder="$15-25" /></div>
@@ -294,13 +309,13 @@ function App() {
         <div style={{ marginTop: 8, marginBottom: 8 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
             <label style={{ ...formLabel, marginBottom: 0 }}>Appellations</label>
-            <button onClick={addSub} style={{ ...btnSmall, color: C.accent, borderColor: C.accent }}>+ Add</button>
+            <button onClick={addSub} style={{ ...btnSmall, color: C.accent, borderColor: C.accent, gap: 3 }}><Plus size={12} strokeWidth={2} /> Add</button>
           </div>
           {subs.map((s, i) => (
             <div key={i} style={{ padding: 8, background: C.bg, borderRadius: 6, marginBottom: 4, border: `1px solid ${C.border}` }}>
               <div style={{ display: "flex", gap: 6, marginBottom: 4 }}>
                 <input style={{ ...inputStyle, flex: 1 }} value={s.name} onChange={e => updateSub(i, "name", e.target.value)} placeholder="Appellation name" />
-                <button onClick={() => removeSub(i)} style={{ ...btnSmall, color: C.red }}>{"\u2715"}</button>
+                <button onClick={() => removeSub(i)} style={{ ...btnSmall, color: C.red }}><X size={14} strokeWidth={1.8} /></button>
               </div>
               <input style={{ ...inputStyle, marginBottom: 4 }} value={s.note} onChange={e => updateSub(i, "note", e.target.value)} placeholder="Note" />
               <input style={inputStyle} value={s.picks} onChange={e => updateSub(i, "picks", e.target.value)} placeholder="Producers to look for" />
@@ -312,14 +327,14 @@ function App() {
         <div style={{ marginBottom: 8 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
             <label style={{ ...formLabel, marginBottom: 0 }}>Vintages</label>
-            <button onClick={addVintage} style={{ ...btnSmall, color: C.accent, borderColor: C.accent }}>+ Add</button>
+            <button onClick={addVintage} style={{ ...btnSmall, color: C.accent, borderColor: C.accent, gap: 3 }}><Plus size={12} strokeWidth={2} /> Add</button>
           </div>
           {vintages.map((v, i) => (
             <div key={i} style={{ padding: 8, background: C.bg, borderRadius: 6, marginBottom: 4, border: `1px solid ${C.border}`, display: "flex", gap: 6, alignItems: "flex-start" }}>
               <input style={{ ...inputStyle, width: 60 }} value={v.year} onChange={e => updateVintage(i, "year", e.target.value)} placeholder="Year" />
               <input style={{ ...inputStyle, width: 90 }} value={v.verdict} onChange={e => updateVintage(i, "verdict", e.target.value)} placeholder="Verdict" />
               <input style={{ ...inputStyle, flex: 1 }} value={v.detail} onChange={e => updateVintage(i, "detail", e.target.value)} placeholder="Detail" />
-              <button onClick={() => removeVintage(i)} style={{ ...btnSmall, color: C.red }}>{"\u2715"}</button>
+              <button onClick={() => removeVintage(i)} style={{ ...btnSmall, color: C.red }}><X size={14} strokeWidth={1.8} /></button>
             </div>
           ))}
         </div>
@@ -366,65 +381,15 @@ function App() {
   };
 
   return (
-    <div style={{ background: C.bg, minHeight: "100vh", maxWidth: 480, margin: "0 auto", fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", color: C.text, position: "relative" }}>
-      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <div style={{ background: C.bg, minHeight: "100vh", maxWidth: 480, margin: "0 auto", fontFamily: "'Nunito Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif", color: C.text, position: "relative", paddingBottom: 72 }}>
+      <link href="https://fonts.googleapis.com/css2?family=Nunito+Sans:wght@400;500;600;700&family=Raleway:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 
       {/* Header */}
-      <div style={{ padding: "16px 16px 12px", background: C.card, borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, zIndex: 50 }}>
-        <div>
-          <div style={{ fontSize: 22, fontWeight: 700, color: C.accent, lineHeight: 1.1 }}>Wine Guide</div>
-          <div style={{ fontSize: 11, color: C.textDim, marginTop: 2 }}>Your personal sommelier</div>
-        </div>
-        <button
-          onClick={() => setDrawerOpen(true)}
-          style={{
-            width: 40, height: 40, borderRadius: 10, background: C.bg, border: `1px solid ${C.border}`,
-            fontSize: 22, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-            color: C.text,
-          }}
-        >{"\u2630"}</button>
-      </div>
-
-      {/* Drawer overlay */}
-      {drawerOpen && (
-        <div
-          onClick={() => setDrawerOpen(false)}
-          style={{
-            position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-            background: "rgba(0,0,0,0.4)", zIndex: 200,
-          }}
-        />
-      )}
-
-      {/* Slide-out drawer */}
-      <div style={{
-        position: "fixed", top: 0, right: drawerOpen ? 0 : -280, bottom: 0, width: 280,
-        background: C.card, zIndex: 300, transition: "right 0.25s ease",
-        boxShadow: drawerOpen ? "-4px 0 20px rgba(0,0,0,0.15)" : "none",
-        display: "flex", flexDirection: "column",
-      }}>
-        <div style={{ padding: "20px 20px 16px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <div style={{ fontSize: 16, fontWeight: 700, color: C.accent }}>Menu</div>
-          <button
-            onClick={() => setDrawerOpen(false)}
-            style={{ width: 32, height: 32, borderRadius: 8, background: C.bg, border: `1px solid ${C.border}`, fontSize: 16, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", color: C.textDim }}
-          >{"\u2715"}</button>
-        </div>
-        <div style={{ padding: "12px 0", flex: 1 }}>
-          {tabs.map(t => (
-            <button key={t.id} onClick={() => selectTab(t.id)}
-              style={{
-                display: "flex", alignItems: "center", gap: 14, width: "100%",
-                padding: "14px 24px", border: "none", cursor: "pointer",
-                background: tab === t.id ? C.accentGlow : "transparent",
-                borderRight: tab === t.id ? `3px solid ${C.accent}` : "3px solid transparent",
-                transition: "all 0.15s",
-              }}>
-              <span style={{ fontSize: 22 }}>{t.icon}</span>
-              <span style={{ fontSize: 15, fontWeight: tab === t.id ? 600 : 400, color: tab === t.id ? C.accent : C.text }}>{t.label}</span>
-            </button>
-          ))}
-        </div>
+      <div style={{ padding: "16px 16px 12px", background: C.accentGradient, position: "sticky", top: 0, zIndex: 50, overflow: "hidden" }}>
+        <GrapeLeaf size={90} color="#fff" opacity={0.08} style={{ position: "absolute", right: -10, top: -15, transform: "rotate(25deg)" }} />
+        <VineTendril width={150} color="#fff" opacity={0.06} style={{ position: "absolute", left: -20, bottom: -5 }} />
+        <div style={{ fontSize: 26, fontWeight: 700, color: "#FFFFFF", lineHeight: 1.1, position: "relative", fontFamily: "'Raleway', 'Nunito Sans', sans-serif", letterSpacing: -0.5 }}>Wine Guide</div>
+        <div style={{ fontSize: 11, color: "rgba(255,255,255,0.7)", marginTop: 3, position: "relative", letterSpacing: 2, textTransform: "uppercase", fontWeight: 500 }}>Your personal sommelier</div>
       </div>
 
       {/* Chat Tab - always mounted to preserve state */}
@@ -441,7 +406,7 @@ function App() {
           const isAdding = adding?.tab === "grapes";
           return (
             <div>
-              <div style={{ fontSize: 11, letterSpacing: 3, color: C.textDim, textTransform: "uppercase", marginBottom: 16 }}>Grape Variety Guide</div>
+              <div style={{ fontSize: 10, letterSpacing: 4, color: C.textDim, textTransform: "uppercase", marginBottom: 16, fontWeight: 700 }}>Grape Variety Guide</div>
 
               {isAdding ? (
                 <GrapeForm onCancel={cancelEdit} onSave={(data) => { upsertGrape(data); setAdding(null); bump(); }} />
@@ -449,11 +414,12 @@ function App() {
                 addButton("Add Grape", () => { cancelEdit(); setAdding({ tab: "grapes" }); })
               )}
 
-              {["always", "sometimes", "avoid"].map(safety => {
+              {["always", "sometimes", "avoid"].map((safety, safetyIdx) => {
                 const filtered = grapes.filter(g => g.safety === safety);
                 if (filtered.length === 0) return null;
                 return (
                   <div key={safety} style={{ marginBottom: 20 }}>
+                    {safetyIdx > 0 && <VineDivider color={C.accent} opacity={0.12} style={{ margin: "18px 0 14px" }} />}
                     <div style={{ fontSize: 12, fontWeight: 600, color: safetyColor(safety), marginBottom: 8, letterSpacing: 1, textTransform: "uppercase" }}>
                       {safety === "always" ? "Always Safe" : safety === "sometimes" ? "Winemaking Dependent" : "Avoid"}
                     </div>
@@ -466,15 +432,15 @@ function App() {
                       }
 
                       return (
-                        <div key={g.name} style={{ padding: "10px 12px", marginBottom: 6, background: safetyBg(g.safety), borderRadius: 8, borderLeft: `3px solid ${safetyColor(g.safety)}` }}>
+                        <div key={g.name} style={{ ...cardBase, background: safetyBg(g.safety), borderLeft: `3px solid ${safetyColor(g.safety)}` }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <div style={{ fontSize: 15, fontWeight: 600, color: C.text, flex: 1 }}>{g.name}</div>
+                            <div style={{ fontSize: 16, fontWeight: 600, color: C.text, flex: 1, fontFamily: "'Raleway', 'Nunito Sans', sans-serif" }}>{g.name}</div>
                             <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
                               {chatBadge(g.source)}
                               {cardActions(editKey, () => { cancelEdit(); setEditing({ tab: "grapes", id: g.name, data: g }); })}
                             </div>
                           </div>
-                          <div style={{ fontSize: 12.5, color: C.textDim, marginTop: 2, lineHeight: 1.5 }}>{g.note}</div>
+                          <div style={{ fontSize: 12, color: C.textDim, marginTop: 2, lineHeight: 1.6 }}>{g.note}</div>
                           {isConfirming(editKey) && (
                             <div style={{ marginTop: 6, display: "flex", gap: 6, justifyContent: "flex-end" }}>
                               <button onClick={() => setConfirmDelete(null)} style={btnCancel}>Cancel</button>
@@ -487,9 +453,10 @@ function App() {
                   </div>
                 );
               })}
-              <div style={{ padding: 14, background: C.card, borderRadius: 10, border: `1px solid ${C.border}`, marginTop: 8 }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: C.accent, marginBottom: 6 }}>The Rule</div>
-                <div style={{ fontSize: 12.5, color: C.textDim, lineHeight: 1.6, fontStyle: "italic" }}>Thin-skinned, aromatic, high-acid grapes = transparent wines with lift. Thick-skinned grapes = heavy, extracted, jammy.</div>
+              <div style={{ ...cardBase, padding: 14, position: "relative", overflow: "hidden" }}>
+                <WineGlassArt size={60} color={C.accent} opacity={0.08} style={{ position: "absolute", right: 8, top: 6 }} />
+                <div style={{ fontSize: 16, fontWeight: 700, color: C.accent, marginBottom: 6, position: "relative", fontFamily: "'Raleway', 'Nunito Sans', sans-serif" }}>The Rule</div>
+                <div style={{ fontSize: 12, color: C.textDim, lineHeight: 1.6, fontStyle: "italic", position: "relative", paddingRight: 36 }}>Thin-skinned, aromatic, high-acid grapes = transparent wines with lift. Thick-skinned grapes = heavy, extracted, jammy.</div>
               </div>
             </div>
           );
@@ -504,7 +471,7 @@ function App() {
 
           return (
             <div>
-              <div style={{ fontSize: 11, letterSpacing: 3, color: C.textDim, textTransform: "uppercase", marginBottom: 16 }}>Region Guide</div>
+              <div style={{ fontSize: 10, letterSpacing: 4, color: C.textDim, textTransform: "uppercase", marginBottom: 16, fontWeight: 700 }}>Region Guide</div>
 
               {isAdding ? (
                 <RegionForm onCancel={cancelEdit} onSave={(data) => { upsertRegion(data); setAdding(null); bump(); }} />
@@ -512,11 +479,12 @@ function App() {
                 addButton("Add Region", () => { cancelEdit(); setAdding({ tab: "regions" }); })
               )}
 
-              {tiers.map(tier => {
+              {tiers.map((tier, tierIdx) => {
                 const filtered = regions.filter(r => r.tier === tier);
                 if (filtered.length === 0) return null;
                 return (
                   <div key={tier} style={{ marginBottom: 20 }}>
+                    {tierIdx > 0 && <VineDivider color={C.accent} opacity={0.10} style={{ margin: "16px 0 12px" }} />}
                     <div style={{ fontSize: 12, fontWeight: 600, color: tierColor(tier), marginBottom: 8, letterSpacing: 1, textTransform: "uppercase" }}>{tierLabel(tier)}</div>
                     {filtered.map(r => {
                       const editKey = `region:${r.name}`;
@@ -527,9 +495,9 @@ function App() {
                       }
 
                       return (
-                        <div key={r.name} onClick={() => setExpandedRegion(isExpanded ? null : r.name)} style={{ padding: "12px", marginBottom: 6, background: C.card, borderRadius: 8, border: `1px solid ${C.border}`, cursor: "pointer", borderLeft: `3px solid ${tierColor(r.tier)}` }}>
+                        <div key={r.name} onClick={() => setExpandedRegion(isExpanded ? null : r.name)} style={{ ...cardBase, cursor: "pointer", borderLeft: `3px solid ${tierColor(r.tier)}` }}>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                            <div style={{ fontSize: 15, fontWeight: 600, color: C.text, flex: 1 }}>{r.name}</div>
+                            <div style={{ fontSize: 16, fontWeight: 600, color: C.text, flex: 1, fontFamily: "'Raleway', 'Nunito Sans', sans-serif" }}>{r.name}</div>
                             <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                               {chatBadge(r.source)}
                               {r.price && <span style={{ fontSize: 12, color: C.accent, fontWeight: 500 }}>{r.price}</span>}
@@ -546,7 +514,7 @@ function App() {
 
                           {isExpanded && !isConfirming(editKey) && (
                             <div style={{ marginTop: 10, paddingTop: 10, borderTop: `1px solid ${C.border}` }} onClick={e => e.stopPropagation()}>
-                              <div style={{ fontSize: 12.5, color: C.textDim, lineHeight: 1.6, marginBottom: 8 }}>{r.note}</div>
+                              <div style={{ fontSize: 12, color: C.textDim, lineHeight: 1.6, marginBottom: 8 }}>{r.note}</div>
 
                               {r.soils && (
                                 <div style={{ marginBottom: 8 }}>
@@ -604,11 +572,11 @@ function App() {
 
           return (
             <div>
-              <div style={{ fontSize: 11, letterSpacing: 3, color: C.textDim, textTransform: "uppercase", marginBottom: 16 }}>Label Reading Cheat Sheet</div>
+              <div style={{ fontSize: 10, letterSpacing: 4, color: C.textDim, textTransform: "uppercase", marginBottom: 16, fontWeight: 700 }}>Label Reading Cheat Sheet</div>
 
               {/* Green Flags */}
               <div style={{ marginBottom: 20 }}>
-                <div style={{ fontSize: 14, fontWeight: 600, color: C.green, marginBottom: 10 }}>Green Flags</div>
+                <div style={{ fontSize: 18, fontWeight: 700, color: C.green, marginBottom: 10, fontFamily: "'Raleway', 'Nunito Sans', sans-serif" }}>Green Flags</div>
                 {isAddingGreen ? (
                   <LabelForm onCancel={cancelEdit} onSave={(data) => { upsertLabelTip({ ...data, type: "green" }); setAdding(null); bump(); }} />
                 ) : (
@@ -626,15 +594,15 @@ function App() {
                   }
 
                   return (
-                    <div key={i} style={{ padding: "10px 12px", marginBottom: 5, background: C.greenBg, borderRadius: 8, borderLeft: `3px solid ${C.green}` }}>
+                    <div key={i} style={{ ...cardBase, background: C.greenBg, borderLeft: `3px solid ${C.green}` }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <div style={{ fontSize: 13.5, fontWeight: 600, color: C.text, flex: 1 }}>{t.flag}</div>
+                        <div style={{ fontSize: 15, fontWeight: 600, color: C.text, flex: 1, fontFamily: "'Raleway', 'Nunito Sans', sans-serif" }}>{t.flag}</div>
                         <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
                           {chatBadge(t.source)}
                           {cardActions(editKey, () => { cancelEdit(); setEditing({ tab: "labels", id: `green:${t.flag}`, data: t }); })}
                         </div>
                       </div>
-                      <div style={{ fontSize: 12, color: C.textDim, marginTop: 2, lineHeight: 1.5 }}>{t.detail}</div>
+                      <div style={{ fontSize: 12, color: C.textDim, marginTop: 2, lineHeight: 1.6 }}>{t.detail}</div>
                       {isConfirming(editKey) && (
                         <div style={{ marginTop: 6, display: "flex", gap: 6, justifyContent: "flex-end" }}>
                           <button onClick={() => setConfirmDelete(null)} style={btnCancel}>Cancel</button>
@@ -648,7 +616,8 @@ function App() {
 
               {/* Red Flags */}
               <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: C.red, marginBottom: 10 }}>Red Flags</div>
+                <VineDivider color={C.accent} opacity={0.10} style={{ margin: "8px 0 14px" }} />
+                <div style={{ fontSize: 18, fontWeight: 700, color: C.red, marginBottom: 10, fontFamily: "'Raleway', 'Nunito Sans', sans-serif" }}>Red Flags</div>
                 {isAddingRed ? (
                   <LabelForm onCancel={cancelEdit} onSave={(data) => { upsertLabelTip({ ...data, type: "red" }); setAdding(null); bump(); }} />
                 ) : (
@@ -666,15 +635,15 @@ function App() {
                   }
 
                   return (
-                    <div key={i} style={{ padding: "10px 12px", marginBottom: 5, background: C.redBg, borderRadius: 8, borderLeft: `3px solid ${C.red}` }}>
+                    <div key={i} style={{ ...cardBase, background: C.redBg, borderLeft: `3px solid ${C.red}` }}>
                       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                        <div style={{ fontSize: 13.5, fontWeight: 600, color: C.text, flex: 1 }}>{t.flag}</div>
+                        <div style={{ fontSize: 15, fontWeight: 600, color: C.text, flex: 1, fontFamily: "'Raleway', 'Nunito Sans', sans-serif" }}>{t.flag}</div>
                         <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
                           {chatBadge(t.source)}
                           {cardActions(editKey, () => { cancelEdit(); setEditing({ tab: "labels", id: `red:${t.flag}`, data: t }); })}
                         </div>
                       </div>
-                      <div style={{ fontSize: 12, color: C.textDim, marginTop: 2, lineHeight: 1.5 }}>{t.detail}</div>
+                      <div style={{ fontSize: 12, color: C.textDim, marginTop: 2, lineHeight: 1.6 }}>{t.detail}</div>
                       {isConfirming(editKey) && (
                         <div style={{ marginTop: 6, display: "flex", gap: 6, justifyContent: "flex-end" }}>
                           <button onClick={() => setConfirmDelete(null)} style={btnCancel}>Cancel</button>
@@ -710,22 +679,23 @@ function App() {
             return (b.addedDate || "").localeCompare(a.addedDate || "");
           });
 
-          const segBtn = (view, label) => ({
-            padding: "8px 0", fontSize: 13, fontWeight: 600, flex: 1, textAlign: "center",
+          const segBtn = (view) => ({
+            padding: "8px 0", fontSize: 13, fontWeight: 600, flex: 1,
             background: cellarView === view ? C.accent : C.card, color: cellarView === view ? "#fff" : C.textDim,
             border: `1px solid ${cellarView === view ? C.accent : C.border}`, cursor: "pointer",
             borderRadius: view === "cellar" ? "8px 0 0 8px" : "0 8px 8px 0",
+            display: "inline-flex", alignItems: "center", justifyContent: "center", gap: 6,
           });
 
           return (
             <div>
               {/* Segmented toggle: Cellar | Hunt List */}
               <div style={{ display: "flex", marginBottom: 14 }}>
-                <button onClick={() => { setCellarView("cellar"); cancelEdit(); }} style={segBtn("cellar", "Cellar")}>
-                  {"\uD83C\uDF77"} Cellar {cellar.length > 0 ? `(${cellar.length})` : ""}
+                <button onClick={() => { setCellarView("cellar"); cancelEdit(); }} style={segBtn("cellar")}>
+                  <Wine size={14} strokeWidth={2} /> Cellar {cellar.length > 0 ? `(${cellar.length})` : ""}
                 </button>
-                <button onClick={() => { setCellarView("huntList"); cancelEdit(); }} style={segBtn("huntList", "Hunt List")}>
-                  {"\uD83C\uDFAF"} Hunt List {huntList.length > 0 ? `(${huntList.length})` : ""}
+                <button onClick={() => { setCellarView("huntList"); cancelEdit(); }} style={segBtn("huntList")}>
+                  <Target size={14} strokeWidth={2} /> Hunt List {huntList.length > 0 ? `(${huntList.length})` : ""}
                 </button>
               </div>
 
@@ -734,8 +704,8 @@ function App() {
                 <div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 12 }}>
                     <div>
-                      <div style={{ fontSize: 11, letterSpacing: 3, color: C.textDim, textTransform: "uppercase" }}>Tasting Log</div>
-                      <div style={{ fontSize: 20, fontWeight: 500, color: C.text, marginTop: 2 }}>My Cellar</div>
+                      <div style={{ fontSize: 10, letterSpacing: 4, color: C.textDim, textTransform: "uppercase", fontWeight: 700 }}>Tasting Log</div>
+                      <div style={{ fontSize: 26, fontWeight: 700, color: C.text, marginTop: 2, fontFamily: "'Raleway', 'Nunito Sans', sans-serif", letterSpacing: -0.5 }}>My Cellar</div>
                     </div>
                     <div style={{ fontSize: 12, color: C.textDim }}>{sorted.length} wines</div>
                   </div>
@@ -744,7 +714,7 @@ function App() {
                   <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
                     <button onClick={() => setCellarSort("date")} style={{ padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600, background: cellarSort === "date" ? C.accent : C.card, color: cellarSort === "date" ? "#fff" : C.textDim, border: `1px solid ${cellarSort === "date" ? C.accent : C.border}`, cursor: "pointer" }}>Newest</button>
                     <button onClick={() => setCellarSort("rating")} style={{ padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 600, background: cellarSort === "rating" ? C.accent : C.card, color: cellarSort === "rating" ? "#fff" : C.textDim, border: `1px solid ${cellarSort === "rating" ? C.accent : C.border}`, cursor: "pointer" }}>Top Rated</button>
-                    <button onClick={handleExport} style={{ marginLeft: "auto", padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 500, background: C.card, color: C.accent, border: `1px solid ${C.border}`, cursor: "pointer" }}>Export</button>
+                    <button onClick={handleExport} style={{ marginLeft: "auto", padding: "6px 14px", borderRadius: 20, fontSize: 12, fontWeight: 500, background: C.card, color: C.accent, border: `1px solid ${C.border}`, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4 }}><Download size={14} strokeWidth={2} /> Export</button>
                   </div>
 
                   {/* Verdict filter pills */}
@@ -772,7 +742,8 @@ function App() {
 
                   {/* Tasting entries */}
                   {sorted.length === 0 ? (
-                    <div style={{ padding: 24, textAlign: "center", color: C.textDim, fontSize: 14 }}>
+                    <div style={{ padding: 32, textAlign: "center", color: C.textDim, fontSize: 14 }}>
+                      <WineGlassArt size={64} color={C.accent} opacity={0.15} style={{ margin: "0 auto 12px", display: "block" }} />
                       {verdictFilter ? `No "${verdictFilter}" wines yet.` : "No tastings logged yet. Chat with the sommelier about wines you've tried and they'll appear here automatically."}
                     </div>
                   ) : sorted.map((t) => {
@@ -787,9 +758,9 @@ function App() {
 
                     return (
                       <div key={entryId} onClick={() => setExpandedCellarId(isExpanded ? null : entryId)}
-                        style={{ padding: "14px 16px", marginBottom: 8, background: C.card, borderRadius: 10, border: `1px solid ${C.border}`, borderLeft: `3px solid ${verdictColor(t.verdict)}`, cursor: "pointer" }}>
+                        style={{ ...cardBase, borderLeft: `3px solid ${verdictColor(t.verdict)}`, cursor: "pointer" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                          <div style={{ fontSize: 15, fontWeight: 600, color: C.text, flex: 1 }}>{t.wine}</div>
+                          <div style={{ fontSize: 16, fontWeight: 600, color: C.text, flex: 1, fontFamily: "'Raleway', 'Nunito Sans', sans-serif" }}>{t.wine}</div>
                           <div style={{ display: "flex", gap: 8, alignItems: "center", marginLeft: 8, flexShrink: 0 }}>
                             {t.rating && <div style={{ fontSize: 16, fontWeight: 700, color: C.accent }}>{t.rating}</div>}
                             <div style={{
@@ -802,17 +773,17 @@ function App() {
 
                         {isExpanded && (
                           <div style={{ marginTop: 8, borderTop: `1px solid ${C.border}`, paddingTop: 8 }} onClick={e => e.stopPropagation()}>
-                            {t.notes && <div style={{ fontSize: 12.5, color: C.textDim, lineHeight: 1.5, fontStyle: "italic", marginBottom: 8 }}>{t.notes}</div>}
+                            {t.notes && <div style={{ fontSize: 12, color: C.textDim, lineHeight: 1.6, fontStyle: "italic", marginBottom: 8 }}>{t.notes}</div>}
                             <WineLinks wineName={t.wine} producerUrl={t.producerUrl} />
                             <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", marginTop: 6 }}>
-                              <button onClick={() => { cancelEdit(); setEditing({ tab: "cellar", id: entryId, data: t }); }} style={btnSmall}>{"\u270F\uFE0F"} Edit</button>
+                              <button onClick={() => { cancelEdit(); setEditing({ tab: "cellar", id: entryId, data: t }); }} style={{ ...btnSmall, gap: 4 }}><Pencil size={12} strokeWidth={1.8} /> Edit</button>
                               {isConfirming(editKey) ? (
                                 <>
                                   <button onClick={() => setConfirmDelete(null)} style={btnCancel}>Cancel</button>
                                   <button onClick={() => { deleteCellarEntry(entryId); setConfirmDelete(null); setExpandedCellarId(null); bump(); }} style={btnDanger}>Delete</button>
                                 </>
                               ) : (
-                                <button onClick={() => setConfirmDelete(editKey)} style={{ ...btnSmall, color: C.red }}>{"\u2715"} Delete</button>
+                                <button onClick={() => setConfirmDelete(editKey)} style={{ ...btnSmall, color: C.red, gap: 4 }}><X size={12} strokeWidth={1.8} /> Delete</button>
                               )}
                             </div>
                           </div>
@@ -824,9 +795,10 @@ function App() {
                   {/* Palate Notes */}
                   {palateNotes.length > 0 && (
                     <div style={{ marginTop: 24 }}>
+                      <VineTendril width={140} color={C.accent} opacity={0.12} style={{ margin: "0 auto 8px", display: "block" }} />
                       <div style={{ fontSize: 12, fontWeight: 600, color: C.accent, marginBottom: 10, letterSpacing: 1, textTransform: "uppercase" }}>Palate Evolution</div>
                       {palateNotes.map((n, i) => (
-                        <div key={i} style={{ padding: "10px 12px", marginBottom: 5, background: C.accentGlow, borderRadius: 8, borderLeft: `3px solid ${C.accent}`, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                        <div key={i} style={{ ...cardBase, background: C.accentGlow, borderLeft: `3px solid ${C.accent}`, display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
                           <div style={{ flex: 1 }}>
                             <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>{n.text}</div>
                             <div style={{ fontSize: 10, color: C.textFaint, marginTop: 4 }}>{n.date}</div>
@@ -837,7 +809,7 @@ function App() {
                               <button onClick={() => { deletePalateNote(i); setConfirmDelete(null); bump(); }} style={{ ...btnDanger, fontSize: 10 }}>Yes</button>
                             </div>
                           ) : (
-                            <button onClick={() => setConfirmDelete(`palate:${i}`)} style={{ ...btnSmall, color: C.red, flexShrink: 0 }}>{"\u2715"}</button>
+                            <button onClick={() => setConfirmDelete(`palate:${i}`)} style={{ ...btnSmall, color: C.red, flexShrink: 0 }}><X size={14} strokeWidth={1.8} /></button>
                           )}
                         </div>
                       ))}
@@ -851,14 +823,15 @@ function App() {
                 <div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginBottom: 12 }}>
                     <div>
-                      <div style={{ fontSize: 11, letterSpacing: 3, color: C.textDim, textTransform: "uppercase" }}>Shopping List</div>
-                      <div style={{ fontSize: 20, fontWeight: 500, color: C.text, marginTop: 2 }}>Hunt List</div>
+                      <div style={{ fontSize: 10, letterSpacing: 4, color: C.textDim, textTransform: "uppercase", fontWeight: 700 }}>Shopping List</div>
+                      <div style={{ fontSize: 26, fontWeight: 700, color: C.text, marginTop: 2, fontFamily: "'Raleway', 'Nunito Sans', sans-serif", letterSpacing: -0.5 }}>Hunt List</div>
                     </div>
                     <div style={{ fontSize: 12, color: C.textDim }}>{huntList.length} wines</div>
                   </div>
 
                   {sortedHunt.length === 0 ? (
-                    <div style={{ padding: 24, textAlign: "center", color: C.textDim, fontSize: 14 }}>
+                    <div style={{ padding: 32, textAlign: "center", color: C.textDim, fontSize: 14 }}>
+                      <WineBottle size={64} color={C.accent} opacity={0.15} style={{ margin: "0 auto 12px", display: "block" }} />
                       No wines on your hunt list yet. Ask the sommelier for recommendations and they'll add them here.
                     </div>
                   ) : sortedHunt.map((h) => {
@@ -868,9 +841,9 @@ function App() {
 
                     return (
                       <div key={hId} onClick={() => setExpandedCellarId(isExpanded ? null : `hunt:${hId}`)}
-                        style={{ padding: "14px 16px", marginBottom: 8, background: C.card, borderRadius: 10, border: `1px solid ${C.border}`, borderLeft: `3px solid ${priorityColor(h.priority)}`, cursor: "pointer" }}>
+                        style={{ ...cardBase, borderLeft: `3px solid ${priorityColor(h.priority)}`, cursor: "pointer" }}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                          <div style={{ fontSize: 15, fontWeight: 600, color: C.text, flex: 1 }}>{h.wine}</div>
+                          <div style={{ fontSize: 16, fontWeight: 600, color: C.text, flex: 1, fontFamily: "'Raleway', 'Nunito Sans', sans-serif" }}>{h.wine}</div>
                           <div style={{ display: "flex", gap: 8, alignItems: "center", marginLeft: 8, flexShrink: 0 }}>
                             {h.priceRange && <span style={{ fontSize: 12, color: C.accent, fontWeight: 500 }}>{h.priceRange}</span>}
                             <div style={{
@@ -879,7 +852,7 @@ function App() {
                             }}>{priorityLabel(h.priority)}</div>
                           </div>
                         </div>
-                        <div style={{ fontSize: 12.5, color: C.textDim, marginTop: 4, lineHeight: 1.5 }}>{h.why}</div>
+                        <div style={{ fontSize: 12, color: C.textDim, marginTop: 4, lineHeight: 1.6 }}>{h.why}</div>
 
                         {isExpanded && (
                           <div style={{ marginTop: 8, borderTop: `1px solid ${C.border}`, paddingTop: 8 }} onClick={e => e.stopPropagation()}>
@@ -892,7 +865,7 @@ function App() {
                                   <button onClick={() => { removeHuntListEntry(h.wine); setConfirmDelete(null); setExpandedCellarId(null); bump(); }} style={btnDanger}>Remove</button>
                                 </>
                               ) : (
-                                <button onClick={() => setConfirmDelete(deleteKey)} style={{ ...btnSmall, color: C.red }}>{"\u2715"} Remove</button>
+                                <button onClick={() => setConfirmDelete(deleteKey)} style={{ ...btnSmall, color: C.red, gap: 4 }}><X size={12} strokeWidth={1.8} /> Remove</button>
                               )}
                             </div>
                           </div>
@@ -907,12 +880,37 @@ function App() {
         })()}
       </div>
 
+      {/* Bottom Tab Bar */}
+      <div style={{
+        position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)",
+        width: "100%", maxWidth: 480, background: C.tabBar,
+        borderTop: `1px solid ${C.tabBarBorder}`,
+        display: "flex", justifyContent: "space-around", alignItems: "center",
+        padding: "6px 0 calc(6px + env(safe-area-inset-bottom, 0px))",
+        zIndex: 100, boxShadow: "0 -2px 8px rgba(0,0,0,0.06)",
+      }}>
+        {tabs.map(t => {
+          const isActive = tab === t.id;
+          return (
+            <button key={t.id} onClick={() => selectTab(t.id)}
+              style={{
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 2,
+                padding: "4px 12px", background: "none", border: "none", cursor: "pointer",
+                color: isActive ? C.tabActive : C.tabInactive, transition: "color 0.15s",
+              }}>
+              <t.Icon size={20} strokeWidth={isActive ? 2.2 : 1.6} color={isActive ? C.tabActive : C.tabInactive} />
+              <span style={{ fontSize: 10, fontWeight: isActive ? 600 : 400, letterSpacing: 0.3 }}>{t.label}</span>
+            </button>
+          );
+        })}
+      </div>
+
       <style>{`
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         ::-webkit-scrollbar { display: none; }
         body { margin: 0; background: ${C.bg}; }
-        textarea::placeholder { color: ${C.textFaint}; font-family: 'Inter', sans-serif; }
-        input::placeholder { color: ${C.textFaint}; font-family: 'Inter', sans-serif; }
+        textarea::placeholder { color: ${C.textFaint}; font-family: 'Nunito Sans', sans-serif; }
+        input::placeholder { color: ${C.textFaint}; font-family: 'Nunito Sans', sans-serif; }
       `}</style>
     </div>
   );

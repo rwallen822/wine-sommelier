@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { C } from "./theme";
+import { Camera, ArrowUp, X } from "lucide-react";
 import { buildSystemPrompt } from "./systemPrompt";
 import { getMessages, saveMessages } from "./storage";
 import { TOOL_DEFINITIONS, executeToolCall } from "./toolDefinitions";
@@ -458,15 +459,10 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
     e.target.value = "";
   }, []);
 
-  const handleKeyDown = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      sendMessage();
-    }
-  };
+  // Enter always inserts a newline — only the send button triggers sendMessage()
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "calc(100dvh - 70px)", position: "relative" }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "calc(100dvh - 70px - 72px)", position: "relative" }}>
       <div style={{ flex: 1, overflowY: "auto", padding: "8px 0", WebkitOverflowScrolling: "touch" }}>
         {messages.map((m, i) => (
           <div key={i} style={{ padding: m.role === "system" ? "2px 0" : "4px 0" }}>
@@ -559,7 +555,7 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
       </div>
 
       {/* Bottom controls — pinned, never scroll */}
-      <div style={{ flexShrink: 0, paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
+      <div style={{ flexShrink: 0, paddingBottom: 0 }}>
         {pendingImage && (
           <div style={{ padding: "8px 4px", display: "flex", alignItems: "center", gap: 8 }}>
             <div style={{ position: "relative" }}>
@@ -567,7 +563,7 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
               <button
                 onClick={() => { setPendingImage(null); setPendingImageData(null); setPendingMediaType("image/jpeg"); }}
                 style={{ position: "absolute", top: -6, right: -6, width: 18, height: 18, borderRadius: "50%", background: C.red, border: "none", color: "#fff", fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", lineHeight: 1 }}
-              >x</button>
+              ><X size={10} strokeWidth={2.5} /></button>
             </div>
             <div style={{ fontSize: 12, color: C.textDim, fontStyle: "italic" }}>Photo attached</div>
           </div>
@@ -576,19 +572,18 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
         <div style={{ display: "flex", gap: 10, alignItems: "flex-end", padding: "8px 0 8px", borderTop: `1px solid ${C.border}` }}>
           <button
             onClick={() => fileRef.current?.click()}
-            style={{ width: 44, height: 44, borderRadius: 22, background: C.card, border: `1px solid ${C.border}`, color: C.accent, fontSize: 20, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}
-          >{"\u{1F4F7}"}</button>
+            style={{ width: 44, height: 44, borderRadius: 22, background: C.card, border: `1px solid ${C.border}`, color: C.accent, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" }}
+          ><Camera size={20} strokeWidth={1.8} /></button>
           <input ref={fileRef} type="file" accept="image/*" onChange={handleImage} style={{ display: "none" }} />
           <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
             placeholder="What are we drinking?"
             rows={1}
             style={{
               flex: 1, padding: "12px 16px", borderRadius: 22, border: `1px solid ${C.border}`,
               background: C.card, color: C.text, fontSize: 15, fontFamily: "inherit",
-              resize: "none", outline: "none", lineHeight: 1.4, maxHeight: 80,
+              resize: "none", outline: "none", lineHeight: 1.4, maxHeight: 120,
               boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
             }}
           />
@@ -598,12 +593,13 @@ export default function ChatTab({ syncKey, onDataUpdated }) {
             style={{
               width: 44, height: 44, borderRadius: 22,
               background: (input.trim() || pendingImageData) ? C.accent : C.border,
-              border: "none", color: "#FFFFFF", fontSize: 18, cursor: "pointer", flexShrink: 0,
+              border: "none", color: "#FFFFFF", cursor: "pointer", flexShrink: 0,
               opacity: loading ? 0.5 : 1, display: "flex", alignItems: "center", justifyContent: "center",
               transition: "background 0.15s",
             }}
-          >{"\u2191"}</button>
+          ><ArrowUp size={18} strokeWidth={2.5} /></button>
         </div>
+        <div style={{ fontSize: 10, color: C.textFaint, textAlign: "center", paddingBottom: 2 }}>Landscape photos work best for shelf scanning</div>
       </div>
 
       <style>{`
