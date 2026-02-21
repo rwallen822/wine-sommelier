@@ -5,7 +5,7 @@ import { buildSystemPrompt } from "./systemPrompt";
 import { getMessages, saveMessages } from "./storage";
 import { TOOL_DEFINITIONS, executeToolCall } from "./toolDefinitions";
 
-const DEFAULT_GREETING = { role: "assistant", text: "Hey Rich. What are we drinking tonight? Send me a photo or tell me what's in the glass." };
+const DEFAULT_GREETING = { role: "assistant", text: "Okay Rich, what are we getting into tonight? Send me a photo of whatever you're looking at and I'll tell you if it's worth your time — or if you need to be rescued." };
 const MAX_TOOL_LOOPS = 8;
 
 export default function ChatTab({ syncKey, onDataUpdated }) {
